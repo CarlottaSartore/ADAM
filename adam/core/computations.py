@@ -178,6 +178,7 @@ class KinDynComputations:
             mass = link_i.inertial.mass
             o = link_i.inertial.origin.xyz
             rpy = link_i.inertial.origin.rpy
+            """TODO from inertia computed to inertia as casadi variable, then the mass matrix is computed """
             Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
 
             if link_i.name == self.root_link:
