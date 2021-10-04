@@ -88,7 +88,22 @@ def spatial_transform(R, p):
 
 def spatial_inertia(I, mass, c, rpy):
     # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""
-    IO = np.zeros([6, 6])
+    """here we should substitute as: having the origin as a casadi variable since indeed it identifies the lengths, having the inertia as a funciton of the density and the origin as """
+    """    def calculate_inertia(self):
+       
+        geometry_type, visual_data = self.get_geometry(self.get_visual())
+        mass = self.get_mass()
+        if (geometry_type == Geometry.BOX):
+            return mass / 12 * np.array([visual_data.size[1] ** 2 + visual_data.size[2] ** 2, 
+                                visual_data.size[0] ** 2 + visual_data.size[2] ** 2,
+                                visual_data.size[0] ** 2 + visual_data.size[1] ** 2])
+        elif (geometry_type == Geometry.CYLINDER):
+            i_xy_incomplete = (3 ** visual_data.radius ** 2 + visual_data.length ** 2) / 12
+            return mass * np.array([i_xy_incomplete, i_xy_incomplete, visual_data.radius ** 2 / 2])
+        elif (geometry_type == Geometry.SPHERE):
+            inertia = 2 * mass * visual_data.radius ** 2 / 5
+            return np.array([inertia, inertia, inertia])""" 
+    IO = cs.SX.zeros(6,6)
     Sc = cs.skew(c)
     R = R_from_RPY(rpy)
     inertia_matrix = np.array(

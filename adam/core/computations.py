@@ -165,6 +165,7 @@ class KinDynComputations:
         """
         q = cs.SX.sym("q", self.NDoF)
         T_b = cs.SX.sym("T_b", 4, 4)
+        masses = cs.SX.sym("masses",self.tree.N)
         Ic = [None] * len(self.tree.links)
         X_p = [None] * len(self.tree.links)
         Phi = [None] * len(self.tree.links)
@@ -175,7 +176,7 @@ class KinDynComputations:
             link_pi = self.tree.parents[i]
             joint_i = self.tree.joints[i]
             I = link_i.inertial.inertia
-            mass = link_i.inertial.mass
+            mass = masses[i]
             o = link_i.inertial.origin.xyz
             rpy = link_i.inertial.origin.rpy
             """TODO from inertia computed to inertia as casadi variable, then the mass matrix is computed """
@@ -272,9 +273,9 @@ class KinDynComputations:
         X_to_mixed[3:6, 3:6] = T_b[:3, :3].T
         M = X_to_mixed.T @ M @ X_to_mixed
         Jcc = X_to_mixed[:6, :6].T @ Jcm @ X_to_mixed
-
-        M = cs.Function("M", [T_b, q], [M], self.f_opts)
-        Jcm = cs.Function("Jcm", [T_b, q], [Jcc], self.f_opts)
+        print(masses)
+        M = cs.Function("M", [T_b, q, masses], [M], self.f_opts)
+        Jcm = cs.Function("Jcm", [T_b, q, masses], [Jcc], self.f_opts)
         return M, Jcm
 
     def mass_matrix_fun(self):
