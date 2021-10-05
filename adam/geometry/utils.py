@@ -86,7 +86,7 @@ def spatial_transform(R, p):
     return X
 
 
-def spatial_inertia(I, mass, c, rpy):
+def spatial_inertia(inertia_matrix, mass, c, rpy):
     # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""
     """here we should substitute as: having the origin as a casadi variable since indeed it identifies the lengths, having the inertia as a funciton of the density and the origin as """
     """    def calculate_inertia(self):
@@ -106,10 +106,6 @@ def spatial_inertia(I, mass, c, rpy):
     IO = cs.SX.zeros(6,6)
     Sc = cs.skew(c)
     R = R_from_RPY(rpy)
-    inertia_matrix = np.array(
-        [[I.ixx, I.ixy, I.ixz], [I.ixy, I.iyy, I.iyz], [I.ixz, I.iyz, I.izz]]
-    )
-
     IO[3:, 3:] = R @ inertia_matrix @ R.T + mass * Sc @ Sc.T
     IO[3:, :3] = mass * Sc
     IO[:3, 3:] = mass * Sc.T
