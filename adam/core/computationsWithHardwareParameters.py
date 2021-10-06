@@ -9,7 +9,7 @@ from os import error
 import casadi as cs
 import numpy as np
 from prettytable import PrettyTable
-from urdf_parser_py.urdf import URDF
+from urdf_parser_py.urdf import URDF, Inertial
 
 from adam.geometry import utils
 
@@ -28,7 +28,7 @@ class Element:
     idx: int = None
 
 
-class KinDynComputations:
+class KinDynComputationsWithHardwareParameters:
     """This is a small class that retrieves robot quantities represented in a symbolic fashion using CasADi
     in mixed representation, for Floating Base systems - as humanoid robots.
     """
@@ -62,15 +62,28 @@ class KinDynComputations:
             self.tree,
         ) = self.load_model()
 
+    def add_link_info_model(self: None):
+        i = 0; 
+        for item in  self.robot_desc.link_map:
+          print(item)
+          print(i)
+          i= i+1
+        return
+        
+
+
+
     def get_joints_info_from_reduced_model(self, joints_name_list: list) -> list:
         joints_list = []
+ 
         for item in self.robot_desc.joint_map:
             self.robot_desc.joint_map[item].idx = None
-
         for [idx, joint_str] in enumerate(joints_name_list):
             # adding the field idx to the reduced joint list
             self.robot_desc.joint_map[joint_str].idx = idx
             joints_list += [self.robot_desc.joint_map[joint_str]]
+            print(idx)
+            print(joint_str)
         if len(joints_list) != len(joints_name_list):
             raise error("Some joints are not in the URDF")
         return joints_list
@@ -165,20 +178,23 @@ class KinDynComputations:
         """
         q = cs.SX.sym("q", self.NDoF)
         T_b = cs.SX.sym("T_b", 4, 4)
+        masses = cs.SX.sym("masses",self.tree.N)
+        InertiaMatrix = cs.SX.sym("InertiaMatrix", 3, 3)
         Ic = [None] * len(self.tree.links)
         X_p = [None] * len(self.tree.links)
         Phi = [None] * len(self.tree.links)
+        
         M = cs.SX.zeros(self.NDoF + 6, self.NDoF + 6)
 
         for i in range(self.tree.N):
             link_i = self.tree.links[i]
             link_pi = self.tree.parents[i]
             joint_i = self.tree.joints[i]
-            I = link_i.inertial.inertia
-            mass = link_i.inertial.mass
+            mass = masses[i]
             o = link_i.inertial.origin.xyz
             rpy = link_i.inertial.origin.rpy
-            Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
+            """TODO from inertia computed to inertia as casadi variable, then the mass matrix is computed """
+            Ic[i] = utils.spatial_inertia_with_hardware_parameters(InertiaMatrix, mass, o, rpy)
 
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
@@ -271,9 +287,8 @@ class KinDynComputations:
         X_to_mixed[3:6, 3:6] = T_b[:3, :3].T
         M = X_to_mixed.T @ M @ X_to_mixed
         Jcc = X_to_mixed[:6, :6].T @ Jcm @ X_to_mixed
-
-        M = cs.Function("M", [T_b, q], [M], self.f_opts)
-        Jcm = cs.Function("Jcm", [T_b, q], [Jcc], self.f_opts)
+        M = cs.Function("M", [T_b, q, masses, InertiaMatrix], [M], self.f_opts)
+        Jcm = cs.Function("Jcm", [T_b, q, masses, InertiaMatrix], [Jcc], self.f_opts)
         return M, Jcm
 
     def mass_matrix_fun(self):
@@ -440,34 +455,35 @@ class KinDynComputations:
         """
         q = cs.SX.sym("q", self.NDoF)
         T_b = cs.SX.sym("T_b", 4, 4)
+        masses = cs.SX.sym("masses",self.tree.N)
         com_pos = cs.SX.zeros(3, 1)
-        for item in self.robot_desc.link_map:
-            link = self.robot_desc.link_map[item]
-            if link.inertial is not None:
-                fk = self.forward_kinematics_fun(item)
-                T_fk = fk(T_b, q)
-                T_link = utils.H_from_PosRPY(
-                    link.inertial.origin.xyz,
-                    link.inertial.origin.rpy,
-                )
-                # Adding the link transform
-                T_fk = T_fk @ T_link
-                com_pos += T_fk[:3, 3] * link.inertial.mass
-        com_pos /= self.get_total_mass()
-        com = cs.Function("CoM_pos", [T_b, q], [com_pos], self.f_opts)
+       
+        for i in range(self.tree.N):
+            link =  self.tree.links[i]
+            fk = self.forward_kinematics_fun(link.name)                
+            T_fk = fk(T_b, q)
+            T_link = utils.H_from_PosRPY(
+            link.inertial.origin.xyz,
+            link.inertial.origin.rpy,
+            )
+            mass = masses[i]
+            # Adding the link transform
+            T_fk = T_fk @ T_link
+            com_pos += T_fk[:3, 3] * mass
+        com_pos /= self.get_total_mass(masses)
+        print("this is the CoM function with the mass")
+        com = cs.Function("CoM_pos", [T_b, q, masses], [com_pos], self.f_opts)
         return com
 
-    def get_total_mass(self):
+    def get_total_mass(self, masses):
         """Returns the total mass of the robot
 
         Returns:
             mass: The total mass
         """
-        mass = 0.0
-        for item in self.robot_desc.link_map:
-            link = self.robot_desc.link_map[item]
-            if link.inertial is not None:
-                mass += link.inertial.mass
+        mass = cs.SX.sym("mass")
+        for i in range(self.tree.N):
+                mass += masses[i]
         return mass
 
     def rnea(self):
@@ -484,6 +500,7 @@ class KinDynComputations:
         q_dot = cs.SX.sym("q_dot", self.NDoF)
         g = cs.SX.sym("g", 6)
         tau = cs.SX.sym("tau", self.NDoF + 6)
+        InertiaMatrix = cs.SX.sym("InertiaMatrix", 3,3)
         Ic = [None] * len(self.tree.links)
         X_p = [None] * len(self.tree.links)
         Phi = [None] * len(self.tree.links)
@@ -505,11 +522,10 @@ class KinDynComputations:
             link_i = self.tree.links[i]
             link_pi = self.tree.parents[i]
             joint_i = self.tree.joints[i]
-            I = link_i.inertial.inertia
             mass = link_i.inertial.mass
             o = link_i.inertial.origin.xyz
             rpy = link_i.inertial.origin.rpy
-            Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
+            Ic[i] = utils.spatial_inertia_with_hardware_parameters(InertiaMatrix, mass, o, rpy)
 
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
@@ -561,7 +577,7 @@ class KinDynComputations:
                 f[pi] = f[pi] + X_p[i].T @ f[i]
 
         tau[:6] = X_to_mixed.T @ tau[:6]
-        tau = cs.Function("tau", [T_b, q, v_b, q_dot, g], [tau], self.f_opts)
+        tau = cs.Function("tau", [T_b, q, v_b, q_dot, g, InertiaMatrix], [tau], self.f_opts)
         return tau
 
     def bias_force_fun(self):
@@ -575,9 +591,10 @@ class KinDynComputations:
         q = cs.SX.sym("q", self.NDoF)
         v_b = cs.SX.sym("v_b", 6)
         q_dot = cs.SX.sym("q_dot", self.NDoF)
+        InertiaMatrix = cs.SX.sym("InertiaMatrix",3,3)
         tau = self.rnea()
-        h = tau(T_b, q, v_b, q_dot, self.g)
-        return cs.Function("h", [T_b, q, v_b, q_dot], [h], self.f_opts)
+        h = tau(T_b, q, v_b, q_dot, self.g,InertiaMatrix)
+        return cs.Function("h", [T_b, q, v_b, q_dot, InertiaMatrix], [h], self.f_opts)
 
     def coriolis_term_fun(self):
         """Returns the coriolis term of the floating-base dynamics equation,
@@ -591,9 +608,10 @@ class KinDynComputations:
         v_b = cs.SX.sym("v_b", 6)
         q_dot = cs.SX.sym("q_dot", self.NDoF)
         tau = self.rnea()
+        InertiaMatrix = cs.SX.sym("InertiaMatrix",3,3)
         # set in the bias force computation the gravity term to zero
-        C = tau(T_b, q, v_b, q_dot, np.zeros(6))
-        return cs.Function("C", [T_b, q, v_b, q_dot], [C], self.f_opts)
+        C = tau(T_b, q, v_b, q_dot, np.zeros(6), InertiaMatrix)
+        return cs.Function("C", [T_b, q, v_b, q_dot, InertiaMatrix], [C], self.f_opts)
 
     def gravity_term_fun(self):
         """Returns the gravity term of the floating-base dynamics equation,
@@ -605,9 +623,10 @@ class KinDynComputations:
         T_b = cs.SX.sym("T_b", 4, 4)
         q = cs.SX.sym("q", self.NDoF)
         tau = self.rnea()
+        InertiaMatrix = cs.SX.sym("InertiaMatrix",3,3)
         # set in the bias force computation the velocity to zero
-        G = tau(T_b, q, np.zeros(6), np.zeros(self.NDoF), self.g)
-        return cs.Function("G", [T_b, q], [G], self.f_opts)
+        G = tau(T_b, q, np.zeros(6), np.zeros(self.NDoF), self.g, InertiaMatrix)
+        return cs.Function("G", [T_b, q, InertiaMatrix], [G], self.f_opts)
 
     def aba(self):
         raise NotImplementedError

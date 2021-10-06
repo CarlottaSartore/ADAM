@@ -86,23 +86,23 @@ def spatial_transform(R, p):
     return X
 
 
-def spatial_inertia(inertia_matrix, mass, c, rpy):
+def spatial_inertia(I, mass, c, rpy):
     # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""
-    """here we should substitute as: having the origin as a casadi variable since indeed it identifies the lengths, having the inertia as a funciton of the density and the origin as """
-    """    def calculate_inertia(self):
-       
-        geometry_type, visual_data = self.get_geometry(self.get_visual())
-        mass = self.get_mass()
-        if (geometry_type == Geometry.BOX):
-            return mass / 12 * np.array([visual_data.size[1] ** 2 + visual_data.size[2] ** 2, 
-                                visual_data.size[0] ** 2 + visual_data.size[2] ** 2,
-                                visual_data.size[0] ** 2 + visual_data.size[1] ** 2])
-        elif (geometry_type == Geometry.CYLINDER):
-            i_xy_incomplete = (3 ** visual_data.radius ** 2 + visual_data.length ** 2) / 12
-            return mass * np.array([i_xy_incomplete, i_xy_incomplete, visual_data.radius ** 2 / 2])
-        elif (geometry_type == Geometry.SPHERE):
-            inertia = 2 * mass * visual_data.radius ** 2 / 5
-            return np.array([inertia, inertia, inertia])""" 
+    IO = np.zeros([6, 6])
+    Sc = cs.skew(c)
+    R = R_from_RPY(rpy)
+    inertia_matrix = np.array(
+        [[I.ixx, I.ixy, I.ixz], [I.ixy, I.iyy, I.iyz], [I.ixz, I.iyz, I.izz]]
+    )
+
+    IO[3:, 3:] = R @ inertia_matrix @ R.T + mass * Sc @ Sc.T
+    IO[3:, :3] = mass * Sc
+    IO[:3, 3:] = mass * Sc.T
+    IO[:3, :3] = np.eye(3) * mass
+    return IO
+
+def spatial_inertia_with_hardware_parameters(inertia_matrix, mass, c, rpy):
+    # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""
     IO = cs.SX.zeros(6,6)
     Sc = cs.skew(c)
     R = R_from_RPY(rpy)
@@ -110,8 +110,7 @@ def spatial_inertia(inertia_matrix, mass, c, rpy):
     IO[3:, :3] = mass * Sc
     IO[:3, 3:] = mass * Sc.T
     IO[:3, :3] = np.eye(3) * mass
-    return IO
-
+    return IO    
 
 def spatial_skew(v):
     X = cs.SX.zeros(6, 6)
