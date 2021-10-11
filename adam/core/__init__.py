@@ -3,3 +3,5 @@
 # GNU Lesser General Public License v2.1 or any later version.
 
 from . import computations
+
+from . import computationsWithHardwareParameters
