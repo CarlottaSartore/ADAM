@@ -4,3 +4,4 @@
 
 from . import utils
 from . import enums
+from . import linkParametric

@@ -7,20 +7,32 @@ import numpy as np
 from prettytable import PrettyTable
 from urdf_parser_py.urdf import URDF
 from urdfpy import xyz_rpy_to_matrix, matrix_to_xyz_rpy
-from enums import *
 import math
 from adam.geometry import utils
+from enum import Enum, EnumMeta
 
 "definition of I parametric. Note that the off diagonal element are considered to be zero"
 
 class I_parametric:
     def __init__(self) -> None:
-        self.ixx =cs.SX.zeros(1)
+        self.ixx = cs.SX.zeros(1)
         self.ixy = 0 
         self.ixz = 0
-        self.iyy= cs.SX.zeros(1)
+        self.iyy = cs.SX.zeros(1)
         self.iyz = 0
         self.izz = cs.SX.zeros(1)
+        
+class Geometry(Enum):
+    """The different types of geometries that constitute the URDF"""
+    BOX = 1
+    CYLINDER = 2
+    SPHERE = 3
+
+class Side(Enum):
+    """The possible sides of a box geometry"""
+    WIDTH = 1
+    HEIGHT = 2
+    DEPTH = 3
 
 class linkParametric:
 
@@ -29,42 +41,55 @@ class linkParametric:
         link_name: str,
         length_multiplier,
         density, 
-        robot
+        robot,
+        link
     ) -> None:
         self.link_name = link_name
         self.density = density
         self.length_multiplier = length_multiplier
-        link_list = [link_name for corresponding_link in robot.links if corresponding_link.name == link_name]
-        if len(link_list) != 0:
-            self.link =link_list[0]
-        else:
-            print(f"Error modifying link {link_name} it does not exist in the urdf")
-
+        self.link = link
+        self.geometry_type, self.visual_data = self.get_geometry(self.get_visual())
         (self.volume, self.visual_data_new) = self.compute_volume()
         self.mass = self.compute_mass()
         self.I = self.compute_inertia_parametric()
+        self.origin = self.modify_origin()
+        
+    
+    def get_visual(self):
+        """Returns the visual object of a link"""
+        return self.link.visuals[0]
+    
+    @staticmethod
+    def get_geometry(visual_obj):
+        """Returns the geometry type and the corresponding geometry object for a given visual"""
+        if (visual_obj.geometry.box is not None):
+            return [Geometry.BOX, visual_obj.geometry.box]
+        if (visual_obj.geometry.cylinder is not None):
+            return [Geometry.CYLINDER, visual_obj.geometry.cylinder]
+        if (visual_obj.geometry.sphere is not None):
+            return [Geometry.SPHERE, visual_obj.geometry.sphere]
 
     """Function that starting from a multiplier (casadi variable) and link visual characteristics computes the link volume"""
     def compute_volume(self):
         volume = cs.SX.zeros(1)
         """Modifies a link's volume by a given multiplier, in a manner that is logical with the link's geometry"""
-        if (self.link.geometry_type == Geometry.BOX):
+        if (self.geometry_type == Geometry.BOX):
             visual_data_new = cs.SX.zeros(3)
             if(self.link.dimension == Side.WIDTH):
-                visual_data_new[0]= self.link.visual_data.size[0] *self.length_multiplier
+                visual_data_new[0]= self.visual_data.size[0] *self.length_multiplier
             elif (self.link.dimension == Side.HEIGHT):
-                visual_data_new[1] = self.link.visual_data.size[1]*self.length_multiplier
+                visual_data_new[1] = self.visual_data.size[1]*self.length_multiplier
             elif (self.link.dimension == Side.DEPTH):
-                visual_data_new[2] = self.link.visual_data.size[2]*self.length_multiplier
+                visual_data_new[2] = self.visual_data.size[2]*self.length_multiplier
             volume = self.visual_data_new[0] * self.visual_data_new[1] * self.visual_data_new[2]
         elif (self.link.geometry_type == Geometry.CYLINDER):
             visual_data_new = cs.SX.zeros(2)
-            visual_data_new[0] = self.link.visual_data.length *self.length_multiplier 
-            visual_data_new[1] = self.link.visual_data.radius
-            volume = math.pi * self.link.visual_data.radius ** 2 * self.visual_data_new
+            visual_data_new[0] = self.visual_data.length *self.length_multiplier 
+            visual_data_new[1] = self.visual_data.radius
+            volume = math.pi * self.visual_data.radius ** 2 * self.visual_data_new
         elif (self.link.geometry_type == Geometry.SPHERE):
             visual_data_new = cs.SX.zeros(1)
-            visual_data_new = self.link.visual_data.radius *self.length_multiplier** (1./3)
+            visual_data_new = self.visual_data.radius *self.length_multiplier** (1./3)
             volume = 4 * math.pi * self.visual_data_new ** 3 / 3 
 
         return volume, visual_data_new
@@ -118,10 +143,6 @@ class linkParametric:
         I.izz = I.ixx
         return I
  
-    def get_visual(self):
-        """Returns the visual object of a link"""
-        return self.link.element.visuals[0]
-
     def get_principal_length(self):
         if (self.link.geometry_type == Geometry.CYLINDER):
             return self.visual_data_new[0]
@@ -132,7 +153,7 @@ class linkParametric:
             return 0
         
 class jointParametric: 
-    def __init__(self, joint_name, parent_link_name,parent_link, joint) -> None:
+    def __init__(self, joint_name,parent_link, joint) -> None:
         self.jointName  = joint_name
         self.parent_link_name = parent_link
         self.joint = joint

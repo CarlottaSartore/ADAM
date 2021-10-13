@@ -7,12 +7,13 @@ from dataclasses import dataclass, field
 from os import error
 
 import casadi as cs
+from casadi.casadi import densify
 import numpy as np
 from prettytable import PrettyTable
 from urdf_parser_py.urdf import URDF
 
 from adam.geometry import utils
-
+from adam.geometry import linkParametric
 
 @dataclass
 class Tree:
@@ -41,6 +42,7 @@ class KinDynComputationsWithHardwareParameters:
         urdfstring: str,
         joints_name_list: list,
         link_name_list: list,
+        joint_children_list: list, 
         root_link: str = "root_link",
         gravity: np.array = np.array([0, 0, -9.80665, 0, 0, 0]),
         f_opts: dict = dict(jit=False, jit_options=dict(flags="-Ofast")),
@@ -50,10 +52,12 @@ class KinDynComputationsWithHardwareParameters:
             urdfstring (str): path of the urdf
             joints_name_list (list): list of the actuated joints
             link_name_list (list): list of  link to be optimized
+            joint_children_list: list of the children link to be optimized 
             root_link (str, optional): the first link. Defaults to 'root_link'.
         """
         self.robot_desc = URDF.from_xml_file(urdfstring)
         self.joints_list = self.get_joints_info_from_reduced_model(joints_name_list)
+        self.joint_children_list = joint_children_list
         self.link_name_list = link_name_list
         self.NDoF = len(self.joints_list)
         self.root_link = root_link
@@ -169,27 +173,49 @@ class KinDynComputationsWithHardwareParameters:
         """
         q = cs.SX.sym("q", self.NDoF)
         T_b = cs.SX.sym("T_b", 4, 4)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
         Ic = [None] * len(self.tree.links)
         X_p = [None] * len(self.tree.links)
         Phi = [None] * len(self.tree.links)
         M = cs.SX.zeros(self.NDoF + 6, self.NDoF + 6)
 
         for i in range(self.tree.N):
-            link_i = self.tree.links[i]
-            link_pi = self.tree.parents[i]
-            joint_i = self.tree.joints[i]
-            I = link_i.inertial.inertia
-            mass = link_i.inertial.mass
-            o = link_i.inertial.origin.xyz
-            rpy = link_i.inertial.origin.rpy
-            Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
+            if self.tree.links[i].name in self.link_name_list:
+                print("we are in the parametric")
+                j = self.link_name_list.index(self.tree.links[i].name)
+                link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot_desc, self.tree.links[i])
+                I = link_i.I
+                mass = link_i.mass
+                o = link_i.origin[0:2]
+                rpy = link_i.origin[3:5]
+                Ic[i] = utils.spatial_inertial_with_parameter(I,mass,o,rpy)
+                joint_i = self.tree.joints[i]
+                joint_i_param = linkParametric.jointParametric(joint_i.name,link_i, joint_i)
+                o_joint = joint_i_param.origin[0:2]
+                rpy_joint = joint_i_param.origin[3:5]
+            else:
+                print("we are in the normal one ")
+                link_i = self.tree.links[i]
+                joint_i = self.tree.joints[i]
+                I = link_i.inertial.inertia
+                mass = link_i.inertial.mass
+                o = link_i.inertial.origin.xyz
+                rpy = link_i.inertial.origin.rpy
+                if joint_i.idx is not None:
+                    o_joint = joint_i.origin.xyz
+                    rpy_joint = joint_i.origin.rpy
+                else: 
+                    o_joint = [0.0, 0.0, 0.0]
+                    rpy_joint = [0.0, 0.0, 0.]
+                Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
 
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
                 X_p[i] = utils.spatial_transform(np.eye(3), np.zeros(3))
                 Phi[i] = cs.np.eye(6)
             elif joint_i.type == "fixed":
-                X_J = utils.X_fixed_joint(joint_i.origin.xyz, joint_i.origin.rpy)
+                X_J = utils.X_fixed_joint(o_joint, rpy_joint)
                 X_p[i] = X_J
                 Phi[i] = cs.vertcat(0, 0, 0, 0, 0, 0)
             elif joint_i.type == "revolute":
@@ -198,8 +224,8 @@ class KinDynComputationsWithHardwareParameters:
                 else:
                     q_ = 0.0
                 X_J = utils.X_revolute_joint(
-                    joint_i.origin.xyz,
-                    joint_i.origin.rpy,
+                    o_joint,
+                    rpy_joint,
                     joint_i.axis,
                     q_,
                 )
@@ -276,8 +302,8 @@ class KinDynComputationsWithHardwareParameters:
         M = X_to_mixed.T @ M @ X_to_mixed
         Jcc = X_to_mixed[:6, :6].T @ Jcm @ X_to_mixed
 
-        M = cs.Function("M", [T_b, q], [M], self.f_opts)
-        Jcm = cs.Function("Jcm", [T_b, q], [Jcc], self.f_opts)
+        M = cs.Function("M", [T_b, q, density, length_multiplier], [M], self.f_opts)
+        Jcm = cs.Function("Jcm", [T_b, q, density, length_multiplier], [Jcc], self.f_opts)
         return M, Jcm
 
     def mass_matrix_fun(self):
