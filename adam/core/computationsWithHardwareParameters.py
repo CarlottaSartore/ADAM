@@ -54,7 +54,7 @@ class KinDynComputationsWithHardwareParameters:
         """
         self.robot_desc = URDF.from_xml_file(urdfstring)
         self.joints_list = self.get_joints_info_from_reduced_model(joints_name_list)
-        self.link_name_list = self.get_link_name_list(link_name_list)
+        self.link_name_list = link_name_list
         self.NDoF = len(self.joints_list)
         self.root_link = root_link
         self.g = gravity
@@ -65,11 +65,6 @@ class KinDynComputationsWithHardwareParameters:
             self.connecting_joints,
             self.tree,
         ) = self.load_model()
-    
-    def get_link_name_list(self, link_name_list: list) -> list: 
-        link_list = []
-        
-        return link_list
 
     def get_joints_info_from_reduced_model(self, joints_name_list: list) -> list:
         joints_list = []
