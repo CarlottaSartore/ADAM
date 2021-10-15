@@ -59,7 +59,6 @@ def H_from_PosRPY(xyz, rpy):
     T[:3, 3] = xyz
     return T
 
-
 def R_from_RPY(rpy):
     return Rz(rpy[2]) @ Ry(rpy[1]) @ Rx(rpy[0])
 
@@ -87,39 +86,39 @@ def spatial_transform(R, p):
 
 
 def spatial_inertia(I, mass, c, rpy):
-    # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""
-    print(I)
-    print(mass)
-    print(c)
-    print(rpy)
+    # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""W
     IO = np.zeros([6, 6])
     Sc = cs.skew(c)
     R = R_from_RPY(rpy)
-    inertia_matrix = np.array(
-        [[I.ixx, I.ixy, I.ixz], [I.ixy, I.iyy, I.iyz], [I.ixz, I.iyz, I.izz]]
-    )
-
+    inertia_matrix = I
     IO[3:, 3:] = R @ inertia_matrix @ R.T + mass * Sc @ Sc.T
     IO[3:, :3] = mass * Sc
     IO[:3, 3:] = mass * Sc.T
     IO[:3, :3] = np.eye(3) * mass
-    print("tutto bene")
-    print(IO)
     return IO
-def spatial_inertial_with_parameter(I, mass,c,rpy):
-    # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""
 
+def spatial_inertial_with_parameter(I, mass,c,rpy):
+    print("inside spatial inertial")
+    print(c)
+    print(rpy)
+    # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""
     IO = cs.SX.zeros(6,6)
     Sc = cs.skew(c)
-    R = R_from_RPY(rpy)
-    inertia_matrix = np.array(
-        [[I.ixx, I.ixy, I.ixz], [I.ixy, I.iyy, I.iyz], [I.ixz, I.iyz, I.izz]]
-    )
-
-    IO[3:, 3:] = R @ inertia_matrix @ R.T + mass * Sc @ Sc.T
+    R = cs.SX.zeros(3,3)
+    R_temp = R_from_RPY(rpy)
+    
+    for i in range(3):
+        for j in range(3):
+            R[i,j]= R_temp[i,j]
+    
+    print("rotation matrix")
+    print(R)
+    #TODO
+    inertia_matrix =[[I.ixx, 0, 0], [0, I.iyy, 0], [0, 0, I.izz]]
+    IO[3:, 3:] = R@inertia_matrix@R.T + mass * cs.mtimes(Sc,cs.transpose(Sc))
     IO[3:, :3] = mass * Sc
     IO[:3, 3:] = mass * Sc.T
-    IO[:3, :3] = np.eye(3) * mass
+    IO[:3, :3] = cs.SX.eye(3)* mass
     return IO
 
 def spatial_skew(v):
