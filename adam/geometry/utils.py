@@ -56,7 +56,9 @@ def H_revolute_joint(xyz, rpy, axis, q):
 def H_from_PosRPY(xyz, rpy):
     T = cs.SX.eye(4)
     T[:3, :3] = R_from_RPY(rpy)
-    T[:3, 3] = xyz
+    T[0,3] = xyz[0]
+    T[1,3] = xyz[1]
+    T[2,3] = xyz[2]  
     return T
 
 def R_from_RPY(rpy):
@@ -70,10 +72,13 @@ def X_revolute_joint(xyz, rpy, axis, q):
     return spatial_transform(R, p)
 
 
-def X_fixed_joint(xyz, rpy):
+def X_fixed_joint(xyz, rpy, link_name = None):
     T = H_from_PosRPY(xyz, rpy)
     R = T[:3, :3].T
-    p = -T[:3, :3].T @ T[:3, 3]
+    p = -T[:3, :3].T @ T[:3, 3]    
+    if(link_name is not None): 
+        print("Link Name", link_name)
+        print(T)
     return spatial_transform(R, p)
 
 
@@ -98,27 +103,19 @@ def spatial_inertia(I, mass, c, rpy):
     return IO
 
 def spatial_inertial_with_parameter(I, mass,c,rpy):
-    print("inside spatial inertial")
-    print(c)
-    print(rpy)
+
     # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""
     IO = cs.SX.zeros(6,6)
     Sc = cs.skew(c)
     R = cs.SX.zeros(3,3)
-    R_temp = R_from_RPY(rpy)
-    
-    for i in range(3):
-        for j in range(3):
-            R[i,j]= R_temp[i,j]
-    
-    print("rotation matrix")
-    print(R)
+    R_temp = R_from_RPY(rpy)    
     #TODO
-    inertia_matrix =[[I.ixx, 0, 0], [0, I.iyy, 0], [0, 0, I.izz]]
-    IO[3:, 3:] = R@inertia_matrix@R.T + mass * cs.mtimes(Sc,cs.transpose(Sc))
+    inertia_matrix =cs.vertcat(cs.horzcat(I.ixx,0.0, 0.0), cs.horzcat(0.0, I.iyy, 0.0), cs.horzcat(0.0, 0.0, I.izz))
+    IO[3:, 3:] = R@inertia_matrix@R.T + mass * cs.mtimes(Sc,Sc.T)
     IO[3:, :3] = mass * Sc
     IO[:3, 3:] = mass * Sc.T
     IO[:3, :3] = cs.SX.eye(3)* mass
+
     return IO
 
 def spatial_skew(v):

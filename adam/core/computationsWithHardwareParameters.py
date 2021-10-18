@@ -4,7 +4,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from os import error
+from os import error, link
 
 import casadi as cs
 from casadi.casadi import densify
@@ -187,7 +187,6 @@ class KinDynComputationsWithHardwareParameters:
 
         for i in range(self.tree.N):
             if self.tree.links[i].name in self.link_name_list:
-                print("we are in the parametric")
                 link_original = self.get_element_by_name(self.tree.links[i].name, self.robot)
                 j = self.link_name_list.index(self.tree.links[i].name)
                 link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original)
@@ -200,12 +199,22 @@ class KinDynComputationsWithHardwareParameters:
                 rpy = [link_i.origin[3],link_i.origin[4],link_i.origin[5]]
                 Ic[i] = utils.spatial_inertial_with_parameter(I,mass,o,rpy)
                 joint_i = self.tree.joints[i]
+                print("Initialization")
+                print(i)
+                print(link_i.name)
+                print(joint_i.name)
+                print(self.tree.parents[i].name)
                 joint_i_param = linkParametric.jointParametric(joint_i.name,link_i, joint_i)
                 o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
                 rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
             else:
                 link_i = self.tree.links[i]
                 joint_i = self.tree.joints[i]
+                if(self.tree.parents[i].name in self.link_name_list): 
+                    print("finding parent link")
+                    print(link_i.name)
+                    print(joint_i.name)
+                    print(self.tree.parents[i].name)
                 I = link_i.inertial.inertia
                 mass = link_i.inertial.mass
                 origin = urdfpy.matrix_to_xyz_rpy(link_i.inertial.origin)
@@ -220,11 +229,6 @@ class KinDynComputationsWithHardwareParameters:
                 else: 
                     o_joint = [0.0, 0.0, 0.0]
                     rpy_joint = [0.0, 0.0, 0.]
-                print(I)
-                print(mass)
-                print(o)
-                print(rpy)
-
                 Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
 
             if link_i.name == self.root_link:
@@ -262,7 +266,7 @@ class KinDynComputationsWithHardwareParameters:
             link_i = self.tree.links[i]
             link_pi = self.tree.parents[i]
             joint_i = self.tree.joints[i]
-            if link_pi.name != self.tree.parents[0].name:
+            if link_pi.name != self.tree.parents[0].name: 
                 pi = self.tree.links.index(link_pi)
                 Ic[pi] = Ic[pi] + X_p[i].T @ Ic[i] @ X_p[i]
             F = Ic[i] @ Phi[i]

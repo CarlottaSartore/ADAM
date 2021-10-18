@@ -42,21 +42,15 @@ class Side(Enum):
 
 class linkParametric:
     def __init__(self, link_name: str, length_multiplier, density, robot, link) -> None:
-        self.link_name = link_name
+        self.name = link_name
         self.density = density
         self.length_multiplier = length_multiplier
         self.link = link
         self.geometry_type, self.visual_data = self.get_geometry(self.get_visual())
-        print(self.visual_data)
         (self.volume, self.visual_data_new) = self.compute_volume()
-        print(self.volume)
-        print(self.visual_data_new)
         self.mass = self.compute_mass()
-        print(self.mass)
         self.I = self.compute_inertia_parametric()
-        print(self.I.ixx)
         self.origin = self.modify_origin()
-        print(self.origin)
     def get_visual(self):
         """Returns the visual object of a link"""
         return self.link.visuals[0]
@@ -169,12 +163,12 @@ class linkParametric:
         return I
 
     def get_principal_length(self):
-        if self.link.geometry_type == Geometry.CYLINDER:
+        if self.geometry_type == Geometry.CYLINDER:
             return self.visual_data_new[0]
-        elif self.link.geometry_type == Geometry.BOX:
+        elif self.geometry_type == Geometry.BOX:
             return self.visual_data_new[2]
         else:
-            "TODO understand why in case of cylinder it is zero, most likely because things does not change"
+            "TODO understand why in case of sphere it is zero, most likely because things does not change"
             return 0
 
 
@@ -188,6 +182,6 @@ class jointParametric:
 
     def modify(self):
         length = self.parent_link.get_principal_length()
-        xyz_rpy = matrix_to_xyz_rpy(self.joint.origin)
+        xyz_rpy = cs.SX(matrix_to_xyz_rpy(self.joint.origin))
         xyz_rpy[2] = length
         return xyz_rpy
