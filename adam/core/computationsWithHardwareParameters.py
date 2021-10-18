@@ -46,7 +46,6 @@ class KinDynComputationsWithHardwareParameters:
         urdfstring: str,
         joints_name_list: list,
         link_name_list: list,
-        joint_children_list: list, 
         root_link: str = "root_link",
         gravity: np.array = np.array([0, 0, -9.80665, 0, 0, 0]),
         f_opts: dict = dict(jit=False, jit_options=dict(flags="-Ofast")),
@@ -56,13 +55,11 @@ class KinDynComputationsWithHardwareParameters:
             urdfstring (str): path of the urdf
             joints_name_list (list): list of the actuated joints
             link_name_list (list): list of  link to be optimized
-            joint_children_list: list of the children link to be optimized 
             root_link (str, optional): the first link. Defaults to 'root_link'.
         """
         self.robot_desc = urdfPy.load(urdfstring)
         self.robot = urdfPy.load(urdfstring)
         self.joints_list = self.get_joints_info_from_reduced_model(joints_name_list)
-        self.joint_children_list = joint_children_list
         self.link_name_list = link_name_list
         self.NDoF = len(self.joints_list)
         self.root_link = root_link
@@ -189,6 +186,7 @@ class KinDynComputationsWithHardwareParameters:
             if self.tree.links[i].name in self.link_name_list:
                 link_original = self.get_element_by_name(self.tree.links[i].name, self.robot)
                 j = self.link_name_list.index(self.tree.links[i].name)
+                #TODO it should be done only at initialization
                 link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original)
                 I = link_i.I
                 mass = link_i.mass 
@@ -198,28 +196,26 @@ class KinDynComputationsWithHardwareParameters:
                 o[2] = origin[2]
                 rpy = [link_i.origin[3],link_i.origin[4],link_i.origin[5]]
                 Ic[i] = utils.spatial_inertial_with_parameter(I,mass,o,rpy)
-                joint_i = self.tree.joints[i]
-                print("Initialization")
-                print(i)
-                print(link_i.name)
-                print(joint_i.name)
-                print(self.tree.parents[i].name)
-                joint_i_param = linkParametric.jointParametric(joint_i.name,link_i, joint_i)
-                o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
-                rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
-            else:
+            else: 
                 link_i = self.tree.links[i]
-                joint_i = self.tree.joints[i]
-                if(self.tree.parents[i].name in self.link_name_list): 
-                    print("finding parent link")
-                    print(link_i.name)
-                    print(joint_i.name)
-                    print(self.tree.parents[i].name)
                 I = link_i.inertial.inertia
                 mass = link_i.inertial.mass
                 origin = urdfpy.matrix_to_xyz_rpy(link_i.inertial.origin)
                 o = [origin[0],origin[1], origin[2]]
                 rpy = [origin[3], origin[4], origin[5]]
+                Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
+            if self.tree.parents[i].name in self.link_name_list:    
+                # Joint Part 
+                joint_i = self.tree.joints[i]
+                j = self.link_name_list.index(self.tree.parents[i].name)
+                #TODO it should be done only at initialization
+                link_i_parametric = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original)
+                joint_i_param = linkParametric.jointParametric(joint_i.name,link_i_parametric, joint_i)
+                o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
+                rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
+            else:
+                joint_i = self.tree.joints[i]
+                # start joint 
                 if joint_i.idx is not None:
                     origin_joint = urdfpy.matrix_to_xyz_rpy(link_i.inertial.origin)
                     o_joint = cs.SX.zeros(3)
@@ -229,8 +225,7 @@ class KinDynComputationsWithHardwareParameters:
                 else: 
                     o_joint = [0.0, 0.0, 0.0]
                     rpy_joint = [0.0, 0.0, 0.]
-                Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
-
+                # end joint    
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
                 X_p[i] = utils.spatial_transform(np.eye(3), np.zeros(3))
@@ -239,7 +234,7 @@ class KinDynComputationsWithHardwareParameters:
                 X_J = utils.X_fixed_joint(o_joint, rpy_joint)
                 X_p[i] = X_J
                 Phi[i] = cs.vertcat(0, 0, 0, 0, 0, 0)
-            elif joint_i.joint_type == "revolute":
+            elif joint_i.joint_type == "revolute" or joint_i.joint_type == "continuous":
                 if joint_i.idx is not None:
                     q_ = q[joint_i.idx]
                 else:
@@ -260,8 +255,7 @@ class KinDynComputationsWithHardwareParameters:
                         joint_i.axis[1],
                         joint_i.axis[2],
                     ]
-                )
-
+                )             
         for i in range(self.tree.N - 1, -1, -1):
             link_i = self.tree.links[i]
             link_pi = self.tree.parents[i]

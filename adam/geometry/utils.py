@@ -49,7 +49,9 @@ def H_revolute_joint(xyz, rpy, axis, q):
     T = cs.SX.eye(4)
     R = R_from_RPY(rpy) @ R_from_axisAngle(axis, q)
     T[:3, :3] = R
-    T[:3, 3] = xyz
+    T[0,3] = xyz[0]
+    T[1,3] = xyz[1]
+    T[2,3] = xyz[2]  
     return T
 
 
