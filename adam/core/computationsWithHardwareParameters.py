@@ -176,6 +176,7 @@ class KinDynComputationsWithHardwareParameters:
         q = cs.SX.sym("q", self.NDoF)
         T_b = cs.SX.sym("T_b", 4, 4)
         density = cs.SX.sym("density", len(self.link_name_list))
+        print(len(self.link_name_list))
         length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
         Ic = [None] * len(self.tree.links)
         X_p = [None] * len(self.tree.links)
@@ -184,6 +185,8 @@ class KinDynComputationsWithHardwareParameters:
 
         for i in range(self.tree.N):
             if self.tree.links[i].name in self.link_name_list:
+                print(self.tree.links[i].name)
+                print(self.link_name_list)
                 link_original = self.get_element_by_name(self.tree.links[i].name, self.robot)
                 j = self.link_name_list.index(self.tree.links[i].name)
                 #TODO it should be done only at initialization
@@ -204,9 +207,11 @@ class KinDynComputationsWithHardwareParameters:
                 o = [origin[0],origin[1], origin[2]]
                 rpy = [origin[3], origin[4], origin[5]]
                 Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
-            if self.tree.parents[i].name in self.link_name_list:    
+            if self.tree.parents[i].name in self.link_name_list:   
+                print(self.tree.parents[i].name) 
                 # Joint Part 
                 joint_i = self.tree.joints[i]
+                print(joint_i.name)
                 j = self.link_name_list.index(self.tree.parents[i].name)
                 #TODO it should be done only at initialization
                 link_i_parametric = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original)
@@ -217,7 +222,8 @@ class KinDynComputationsWithHardwareParameters:
                 joint_i = self.tree.joints[i]
                 # start joint 
                 if joint_i.idx is not None:
-                    origin_joint = urdfpy.matrix_to_xyz_rpy(link_i.inertial.origin)
+                    ## Check
+                    origin_joint = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
                     o_joint = cs.SX.zeros(3)
                     rpy_joint = cs.SX.zeros(3)
                     o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]

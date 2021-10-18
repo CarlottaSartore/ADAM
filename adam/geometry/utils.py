@@ -78,9 +78,6 @@ def X_fixed_joint(xyz, rpy, link_name = None):
     T = H_from_PosRPY(xyz, rpy)
     R = T[:3, :3].T
     p = -T[:3, :3].T @ T[:3, 3]    
-    if(link_name is not None): 
-        print("Link Name", link_name)
-        print(T)
     return spatial_transform(R, p)
 
 
