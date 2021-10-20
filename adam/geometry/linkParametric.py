@@ -51,6 +51,8 @@ class linkParametric:
         self.mass = self.compute_mass()
         self.I = self.compute_inertia_parametric()
         self.origin = self.modify_origin()
+        # Find better way to deal with the inertial
+        self.inertial = self.I
     def get_visual(self):
         """Returns the visual object of a link"""
         return self.link.visuals[0]

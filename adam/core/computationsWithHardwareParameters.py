@@ -17,6 +17,7 @@ from adam.geometry import utils
 from adam.geometry import linkParametric
 
 from urdfpy import URDF as urdfPy
+from urdf_parser_py.urdf import URDF as urdf_old
 from urdfpy import xyz_rpy_to_matrix, matrix_to_xyz_rpy
 
 @dataclass
@@ -57,6 +58,10 @@ class KinDynComputationsWithHardwareParameters:
             link_name_list (list): list of  link to be optimized
             root_link (str, optional): the first link. Defaults to 'root_link'.
         """
+        # print(urdfstring)
+        # self.roobot_desc_old = urdf_old.from_xml_files(urdfstring)
+        # path.decode('utf8')
+        self.robot_old = urdf_old.from_xml_file(urdfstring.encode())
         self.robot_desc = urdfPy.load(urdfstring)
         self.robot = urdfPy.load(urdfstring)
         self.joints_list = self.get_joints_info_from_reduced_model(joints_name_list)
@@ -164,7 +169,8 @@ class KinDynComputationsWithHardwareParameters:
         tree.N = len(tree.links)
         logging.debug(table_joints)
         return links, frames, joints, tree
-
+    
+    # Done
     def crba(self):
         """This function computes the Composite Rigid body algorithm (Roy Featherstone) that computes the Mass Matrix.
          The algorithm is complemented with Orin's modifications computing the Centroidal Momentum Matrix
@@ -176,7 +182,6 @@ class KinDynComputationsWithHardwareParameters:
         q = cs.SX.sym("q", self.NDoF)
         T_b = cs.SX.sym("T_b", 4, 4)
         density = cs.SX.sym("density", len(self.link_name_list))
-        print(len(self.link_name_list))
         length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
         Ic = [None] * len(self.tree.links)
         X_p = [None] * len(self.tree.links)
@@ -185,8 +190,6 @@ class KinDynComputationsWithHardwareParameters:
 
         for i in range(self.tree.N):
             if self.tree.links[i].name in self.link_name_list:
-                print(self.tree.links[i].name)
-                print(self.link_name_list)
                 link_original = self.get_element_by_name(self.tree.links[i].name, self.robot)
                 j = self.link_name_list.index(self.tree.links[i].name)
                 #TODO it should be done only at initialization
@@ -211,7 +214,6 @@ class KinDynComputationsWithHardwareParameters:
                 print(self.tree.parents[i].name) 
                 # Joint Part 
                 joint_i = self.tree.joints[i]
-                print(joint_i.name)
                 j = self.link_name_list.index(self.tree.parents[i].name)
                 #TODO it should be done only at initialization
                 link_i_parametric = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original)
@@ -326,7 +328,8 @@ class KinDynComputationsWithHardwareParameters:
         M = cs.Function("M", [T_b, q, density, length_multiplier], [M], self.f_opts)
         Jcm = cs.Function("Jcm", [T_b, q, density, length_multiplier], [Jcc], self.f_opts)
         return M, Jcm
-
+    
+    # Done
     def mass_matrix_fun(self):
         """Returns the Mass Matrix functions computed the CRBA
 
@@ -336,6 +339,7 @@ class KinDynComputationsWithHardwareParameters:
         [M, _] = self.crba()
         return M
 
+    # Done
     def centroidal_momentum_matrix_fun(self):
         """Returns the Centroidal Momentum Matrix functions computed the CRBA
 
@@ -344,7 +348,8 @@ class KinDynComputationsWithHardwareParameters:
         """
         [_, Jcm] = self.crba()
         return Jcm
-
+    
+    # Done
     def forward_kinematics_fun(self, frame):
         """Computes the forward kinematics relative to the specified frame
 
@@ -354,35 +359,56 @@ class KinDynComputationsWithHardwareParameters:
         Returns:
             T_fk (casADi function): The fk represented as Homogenous transformation matrix
         """
-        chain = self.robot_desc.get_chain(self.root_link, frame)
+        chain = self.robot_old.get_chain(self.root_link, frame)
+        self.robot_desc
         q = cs.SX.sym("q", self.NDoF)
         T_b = cs.SX.sym("T_b", 4, 4)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
         T_fk = cs.SX.eye(4)
         T_fk = T_fk @ T_b
+        # for item in self.tree.joints: 
+            # print(item.name)
         for item in chain:
             if item in self.robot_desc.joint_map:
-                joint = self.robot_desc.joint_map[item]
-                if joint.type == "fixed":
-                    xyz = joint.origin.xyz
-                    rpy = joint.origin.rpy
+                i = self.tree.joints.index(self.robot_desc.joint_map[item])
+                if(self.tree.parents[i].name in self.link_name_list): 
+                    joint= self.robot_desc.joint_map[item]
+                    link_original = self.get_element_by_name(self.tree.parents[i].name, self.robot)
+                    j = self.link_name_list.index(self.tree.parents[i].name)
+                    #TODO it should be done only at initialization
+                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, lenght_multiplier[j],density[j],self.robot,link_original)
+                    joint_i_param = linkParametric.jointParametric(item,link_i, joint)
+                    o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
+                    rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
+                else: 
+                    joint = self.robot_desc.joint_map[item]
+                    origin_joint = urdfpy.matrix_to_xyz_rpy(joint.origin)
+                    o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                    rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
+                if joint.joint_type == "fixed":
+                    xyz = o_joint
+                    rpy = rpy_joint
                     joint_frame = utils.H_from_PosRPY(xyz, rpy)
                     T_fk = T_fk @ joint_frame
-                if joint.type == "revolute":
+                if joint.joint_type == "revolute" or joint.joint_type =="continuous" :
                     # if the joint is actuated set the value
                     if joint.idx is not None:
                         q_ = q[joint.idx]
                     else:
                         q_ = 0.0
                     T_joint = utils.H_revolute_joint(
-                        joint.origin.xyz,
-                        joint.origin.rpy,
+                        o_joint,
+                        rpy_joint,
                         joint.axis,
                         q_,
                     )
-                    T_fk = T_fk @ T_joint
-        T_fk = cs.Function("T_fk", [T_b, q], [T_fk], self.f_opts)
+                    
+                    T_fk = T_fk @ T_joint               
+        T_fk = cs.Function("T_fk", [T_b, q, density, lenght_multiplier], [T_fk], self.f_opts)
         return T_fk
 
+    # Done
     def jacobian_fun(self, frame):
         """Returns the Jacobian relative to the specified frame
 
@@ -392,31 +418,48 @@ class KinDynComputationsWithHardwareParameters:
         Returns:
             J_tot (casADi function): The Jacobian relative to the frame
         """
-        chain = self.robot_desc.get_chain(self.root_link, frame)
+        chain = self.robot_old.get_chain(self.root_link, frame)
         q = cs.SX.sym("q", self.NDoF)
         T_b = cs.SX.sym("T_b", 4, 4)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
+
         T_fk = cs.SX.eye(4)
         T_fk = T_fk @ T_b
         J = cs.SX.zeros(6, self.NDoF)
         T_ee = self.forward_kinematics_fun(frame)
-        T_ee = T_ee(T_b, q)
+        T_ee = T_ee(T_b, q, density, length_multiplier)
         P_ee = T_ee[:3, 3]
         for item in chain:
             if item in self.robot_desc.joint_map:
-                joint = self.robot_desc.joint_map[item]
-                if joint.type == "fixed":
-                    xyz = joint.origin.xyz
-                    rpy = joint.origin.rpy
+                i = self.tree.joints.index(self.robot_desc.joint_map[item])
+                if(self.tree.parents[i].name in self.link_name_list): 
+                    joint= self.robot_desc.joint_map[item]
+                    link_original = self.get_element_by_name(self.tree.parents[i].name, self.robot)
+                    j = self.link_name_list.index(self.tree.parents[i].name)
+                    #TODO it should be done only at initialization
+                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, length_multiplier[j],density[j],self.robot,link_original)
+                    joint_i_param = linkParametric.jointParametric(item,link_i, joint)
+                    o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
+                    rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
+                else:
+                    joint = self.robot_desc.joint_map[item]
+                    origin_joint = urdfpy.matrix_to_xyz_rpy(joint.origin)
+                    o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                    rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
+                if joint.joint_type == "fixed":
+                    xyz = o_joint
+                    rpy = rpy_joint
                     joint_frame = utils.H_from_PosRPY(xyz, rpy)
                     T_fk = T_fk @ joint_frame
-                if joint.type == "revolute":
+                if joint.joint_type == "revolute" or joint.joint_type == "continuous":
                     if joint.idx is not None:
                         q_ = q[joint.idx]
                     else:
                         q_ = 0.0
                     T_joint = utils.H_revolute_joint(
-                        joint.origin.xyz,
-                        joint.origin.rpy,
+                        o_joint,
+                        rpy_joint,
                         joint.axis,
                         q_,
                     )
@@ -435,8 +478,9 @@ class KinDynComputationsWithHardwareParameters:
         J_tot[:3, 6:] = J[:3, :]
         J_tot[3:, 3:6] = cs.np.eye(3)
         J_tot[3:, 6:] = J[3:, :]
-        return cs.Function("J_tot", [T_b, q], [J_tot], self.f_opts)
-
+        return cs.Function("J_tot", [T_b, q, density, length_multiplier], [J_tot], self.f_opts)
+    
+    #Done 
     def relative_jacobian_fun(self, frame):
         """Returns the Jacobian between the root link and a specified frame frames
 
@@ -446,31 +490,47 @@ class KinDynComputationsWithHardwareParameters:
         Returns:
             J (casADi function): The Jacobian between the root and the frame
         """
-        chain = self.robot_desc.get_chain(self.root_link, frame)
+        chain = self.robot_old.get_chain(self.root_link, frame)
         q = cs.SX.sym("q", self.NDoF)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
         T_b = np.eye(4)
         T_fk = cs.SX.eye(4)
         T_fk = T_fk @ T_b
         J = cs.SX.zeros(6, self.NDoF)
         T_ee = self.forward_kinematics_fun(frame)
-        T_ee = T_ee(T_b, q)
+        T_ee = T_ee(T_b, q, density, length_multiplier)
         P_ee = T_ee[:3, 3]
         for item in chain:
             if item in self.robot_desc.joint_map:
-                joint = self.robot_desc.joint_map[item]
-                if joint.type == "fixed":
-                    xyz = joint.origin.xyz
-                    rpy = joint.origin.rpy
+                i = self.tree.joints.index(self.robot_desc.joint_map[item])
+                if(self.tree.parents[i].name in self.link_name_list): 
+                    joint= self.robot_desc.joint_map[item]
+                    link_original = self.get_element_by_name(self.tree.parents[i].name, self.robot)
+                    j = self.link_name_list.index(self.tree.parents[i].name)
+                    #TODO it should be done only at initialization
+                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, length_multiplier[j],density[j],self.robot,link_original)
+                    joint_i_param = linkParametric.jointParametric(item,link_i, joint)
+                    o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
+                    rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
+                else:
+                    joint = self.robot_desc.joint_map[item]
+                    origin_joint = urdfpy.matrix_to_xyz_rpy(joint.origin)
+                    o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                    rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
+                if joint.joint_type == "fixed":
+                    xyz = o_joint
+                    rpy = rpy_joint
                     joint_frame = utils.H_from_PosRPY(xyz, rpy)
                     T_fk = T_fk @ joint_frame
-                if joint.type == "revolute":
+                if joint.joint_type == "revolute" or joint.joint_type == "continuous":
                     if joint.idx is not None:
                         q_ = q[joint.idx]
                     else:
                         q_ = 0.0
                     T_joint = utils.H_revolute_joint(
-                        joint.origin.xyz,
-                        joint.origin.rpy,
+                        o_joint,
+                        rpy_joint,
                         joint.axis,
                         q_,
                     )
@@ -481,8 +541,9 @@ class KinDynComputationsWithHardwareParameters:
                     #     cs.jacobian(P_ee, q[joint.idx]), z_prev) # using casadi jacobian
                     if joint.idx is not None:
                         J[:, joint.idx] = cs.vertcat(cs.skew(z_prev) @ p_prev, z_prev)
-        return cs.Function("J", [q], [J], self.f_opts)
+        return cs.Function("J", [q, density, length_multiplier], [J], self.f_opts)
 
+    # Done
     def CoM_position_fun(self):
         """Returns the CoM positon
 
@@ -491,34 +552,63 @@ class KinDynComputationsWithHardwareParameters:
         """
         q = cs.SX.sym("q", self.NDoF)
         T_b = cs.SX.sym("T_b", 4, 4)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
         com_pos = cs.SX.zeros(3, 1)
         for item in self.robot_desc.link_map:
-            link = self.robot_desc.link_map[item]
+            if item in self.link_name_list:
+                link_original = self.get_element_by_name(item, self.robot)
+                j = self.link_name_list.index(item)
+                #TODO it should be done only at initialization
+                link = linkParametric.linkParametric(item, length_multiplier[j],density[j],self.robot,link_original)
+                origin = link.origin; 
+                o = [origin[0],origin[1], origin[2]]
+                rpy = [origin[3], origin[4], origin[5]]
+                mass = link.mass
+            else: 
+                link = self.robot_desc.link_map[item]
+                origin = urdfpy.matrix_to_xyz_rpy(link.inertial.origin)
+                o = [origin[0],origin[1], origin[2]]
+                rpy = [origin[3], origin[4], origin[5]]
+                mass = link.inertial.mass
+                
             if link.inertial is not None:
                 fk = self.forward_kinematics_fun(item)
-                T_fk = fk(T_b, q)
+                T_fk = fk(T_b, q, density, length_multiplier)
                 T_link = utils.H_from_PosRPY(
-                    link.inertial.origin.xyz,
-                    link.inertial.origin.rpy,
+                    o,
+                    rpy,
                 )
                 # Adding the link transform
                 T_fk = T_fk @ T_link
-                com_pos += T_fk[:3, 3] * link.inertial.mass
-        com_pos /= self.get_total_mass()
-        com = cs.Function("CoM_pos", [T_b, q], [com_pos], self.f_opts)
+                com_pos += T_fk[:3, 3] * mass
+        total_mass = self.get_total_mass()         
+        com_pos /= total_mass(density, length_multiplier)
+        com = cs.Function("CoM_pos", [T_b, q, density, length_multiplier], [com_pos], self.f_opts)
         return com
-
+    # Done
     def get_total_mass(self):
         """Returns the total mass of the robot
 
         Returns:
             mass: The total mass
         """
-        mass = 0.0
+
+        density = cs.SX.sym("density", len(self.link_name_list))
+        length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
+        mass =cs.SX.zeros(1)
         for item in self.robot_desc.link_map:
-            link = self.robot_desc.link_map[item]
-            if link.inertial is not None:
-                mass += link.inertial.mass
+            if item in self.link_name_list: 
+                j = self.link_name_list.index(item)
+                link_original = self.robot_desc.link_map[item]
+                link_parametric = linkParametric.linkParametric(item, length_multiplier[j],density[j],self.robot,link_original) 
+                mass += link_parametric.mass
+            else:
+                link = self.robot_desc.link_map[item]
+                if link.inertial is not None:
+                    mass += link.inertial.mass
+
+        mass = cs.Function("mass", [density, length_multiplier], [mass],self.f_opts )            
         return mass
 
     def rnea(self):
