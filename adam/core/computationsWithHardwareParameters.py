@@ -210,13 +210,14 @@ class KinDynComputationsWithHardwareParameters:
                 o = [origin[0],origin[1], origin[2]]
                 rpy = [origin[3], origin[4], origin[5]]
                 Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
-            if self.tree.parents[i].name in self.link_name_list:   
+            if self.tree.parents[i].name in self.link_name_list: 
+                link_original_parent = self.get_element_by_name(self.tree.parents[i].name, self.robot)  
                 print(self.tree.parents[i].name) 
                 # Joint Part 
                 joint_i = self.tree.joints[i]
                 j = self.link_name_list.index(self.tree.parents[i].name)
                 #TODO it should be done only at initialization
-                link_i_parametric = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original)
+                link_i_parametric = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original_parent)
                 joint_i_param = linkParametric.jointParametric(joint_i.name,link_i_parametric, joint_i)
                 o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
                 rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
@@ -625,6 +626,8 @@ class KinDynComputationsWithHardwareParameters:
         q_dot = cs.SX.sym("q_dot", self.NDoF)
         g = cs.SX.sym("g", 6)
         tau = cs.SX.sym("tau", self.NDoF + 6)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
         Ic = [None] * len(self.tree.links)
         X_p = [None] * len(self.tree.links)
         Phi = [None] * len(self.tree.links)
@@ -640,29 +643,74 @@ class KinDynComputationsWithHardwareParameters:
         acc_to_mixed[:3] = -T_b[:3, :3].T @ cs.skew(v_b[3:]) @ v_b[:3]
         acc_to_mixed[3:] = -T_b[:3, :3].T @ cs.skew(v_b[3:]) @ v_b[3:]
         # set initial acceleration (rotated gravity + apparent acceleration)
-        a[0] = -X_to_mixed @ g + acc_to_mixed
+        a[0] =-X_to_mixed @ g + acc_to_mixed
 
         for i in range(self.tree.N):
-            link_i = self.tree.links[i]
+            #link_i = self.tree.links[i]
             link_pi = self.tree.parents[i]
             joint_i = self.tree.joints[i]
-            I = link_i.inertial.inertia
-            mass = link_i.inertial.mass
-            o = link_i.inertial.origin.xyz
-            rpy = link_i.inertial.origin.rpy
-            Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
+            if self.tree.links[i].name in self.link_name_list:
+                link_original = self.get_element_by_name(self.tree.links[i].name, self.robot)
+                j = self.link_name_list.index(self.tree.links[i].name)
+                #TODO it should be done only at initialization
+                link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original)
+                I = link_i.I
+                mass = link_i.mass 
+                o = cs.SX.zeros(3)
+                o[0] = origin[0]
+                o[1] = origin[1]
+                o[2] = origin[2]
+                rpy = [link_i.origin[3],link_i.origin[4],link_i.origin[5]]
+                Ic[i] = utils.spatial_inertial_with_parameter(I,mass,o,rpy)
+            else: 
+                link_i = self.tree.links[i]
+                I = link_i.inertial.inertia
+                mass = link_i.inertial.mass
+                origin = urdfpy.matrix_to_xyz_rpy(link_i.inertial.origin)
+                o = [origin[0],origin[1], origin[2]]
+                rpy = [origin[3], origin[4], origin[5]]
+                Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
+            if link_pi.name in self.link_name_list:   
+                #print(self.tree.parents[i].name) 
+                # Joint Part 
+                joint_i = self.tree.joints[i]
+                j = self.link_name_list.index(self.tree.parents[i].name)
+                #TODO it should be done only at initialization
+                link_i_parametric = linkParametric.linkParametric(link_pi.name, length_multiplier[j],density[j],self.robot,link_pi)
+                joint_i_param = linkParametric.jointParametric(joint_i.name,link_i_parametric, joint_i)
+                o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
+                rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
+            else:
+                joint_i = self.tree.joints[i]
+                # start joint 
+                if joint_i.idx is not None:
+                    ## Check
+                    origin_joint = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
+                    o_joint = cs.SX.zeros(3)
+                    rpy_joint = cs.SX.zeros(3)
+                    o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                    rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
+                else: 
+                    o_joint = [0.0, 0.0, 0.0]
+                    rpy_joint = [0.0, 0.0, 0.]
+                # end joint    
+            # I = link_i.inertial.inertia
+            # mass = link_i.inertial.mass
+            # o = link_i.inertial.origin.xyz
+            # rpy = link_i.inertial.origin.rpy
+            # Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
 
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
                 X_p[i] = utils.spatial_transform(np.eye(3), np.zeros(3))
                 Phi[i] = cs.np.eye(6)
                 v_J = Phi[i] @ X_to_mixed @ v_b
-            elif joint_i.type == "fixed":
-                X_J = utils.X_fixed_joint(joint_i.origin.xyz, joint_i.origin.rpy)
+            elif joint_i.joint_type == "fixed":
+                X_J = utils.X_fixed_joint(o_joint, rpy_joint)
                 X_p[i] = X_J
                 Phi[i] = cs.vertcat(0, 0, 0, 0, 0, 0)
                 v_J = cs.SX.zeros(6, 1)
-            elif joint_i.type == "revolute":
+            elif joint_i.joint_type == "revolute" or joint_i.joint_type == "continuous":
                 if joint_i.idx is not None:
                     q_ = q[joint_i.idx]
                     q_dot_ = q_dot[joint_i.idx]
@@ -671,7 +719,7 @@ class KinDynComputationsWithHardwareParameters:
                     q_dot_ = 0.0
 
                 X_J = utils.X_revolute_joint(
-                    joint_i.origin.xyz, joint_i.origin.rpy, joint_i.axis, q_
+                    o_joint, rpy_joint, joint_i.axis, q_
                 )
                 X_p[i] = X_J
                 Phi[i] = cs.vertcat(
@@ -686,9 +734,7 @@ class KinDynComputationsWithHardwareParameters:
                 pi = self.tree.links.index(link_pi)
                 v[i] = X_p[i] @ v[pi] + v_J
                 a[i] = X_p[i] @ a[pi] + utils.spatial_skew(v[i]) @ v_J
-
             f[i] = Ic[i] @ a[i] + utils.spatial_skew_star(v[i]) @ Ic[i] @ v[i]
-
         for i in range(self.tree.N - 1, -1, -1):
             joint_i = self.tree.joints[i]
             link_i = self.tree.links[i]
@@ -702,7 +748,7 @@ class KinDynComputationsWithHardwareParameters:
                 f[pi] = f[pi] + X_p[i].T @ f[i]
 
         tau[:6] = X_to_mixed.T @ tau[:6]
-        tau = cs.Function("tau", [T_b, q, v_b, q_dot, g], [tau], self.f_opts)
+        tau = cs.Function("tau", [T_b, q, v_b, q_dot, g, density, length_multiplier], [tau], self.f_opts)
         return tau
 
     def bias_force_fun(self):
@@ -716,9 +762,11 @@ class KinDynComputationsWithHardwareParameters:
         q = cs.SX.sym("q", self.NDoF)
         v_b = cs.SX.sym("v_b", 6)
         q_dot = cs.SX.sym("q_dot", self.NDoF)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
         tau = self.rnea()
-        h = tau(T_b, q, v_b, q_dot, self.g)
-        return cs.Function("h", [T_b, q, v_b, q_dot], [h], self.f_opts)
+        h = tau(T_b, q, v_b, q_dot, self.g, density, length_multiplier)
+        return cs.Function("h", [T_b, q, v_b, q_dot, density, length_multiplier], [h], self.f_opts)
 
     def coriolis_term_fun(self):
         """Returns the coriolis term of the floating-base dynamics equation,
@@ -731,10 +779,12 @@ class KinDynComputationsWithHardwareParameters:
         q = cs.SX.sym("q", self.NDoF)
         v_b = cs.SX.sym("v_b", 6)
         q_dot = cs.SX.sym("q_dot", self.NDoF)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
         tau = self.rnea()
         # set in the bias force computation the gravity term to zero
-        C = tau(T_b, q, v_b, q_dot, np.zeros(6))
-        return cs.Function("C", [T_b, q, v_b, q_dot], [C], self.f_opts)
+        C = tau(T_b, q, v_b, q_dot, np.zeros(6), density, length_multiplier)
+        return cs.Function("C", [T_b, q, v_b, q_dot, density, length_multiplier], [C], self.f_opts)
 
     def gravity_term_fun(self):
         """Returns the gravity term of the floating-base dynamics equation,
@@ -745,10 +795,12 @@ class KinDynComputationsWithHardwareParameters:
         """
         T_b = cs.SX.sym("T_b", 4, 4)
         q = cs.SX.sym("q", self.NDoF)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        length_multiplier = cs.SX.sym("length_multiplier", len(self.link_name_list))
         tau = self.rnea()
         # set in the bias force computation the velocity to zero
-        G = tau(T_b, q, np.zeros(6), np.zeros(self.NDoF), self.g)
-        return cs.Function("G", [T_b, q], [G], self.f_opts)
+        G = tau(T_b, q, np.zeros(6), np.zeros(self.NDoF), self.g, density, length_multiplier)
+        return cs.Function("G", [T_b, q, density, length_multiplier], [G], self.f_opts)
 
     def aba(self):
         raise NotImplementedError
