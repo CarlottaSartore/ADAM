@@ -23,6 +23,19 @@ class I_parametric:
         self.iyz = 0
         self.izz = cs.SX.zeros(1)
 
+class LinkCharacteristics: 
+    def __init__(self, offset =0.0, dimension = None, flip_direction = False, calculate_origin_from_dimension = True) -> None:
+        
+        self.offset = offset
+        self.flip_direction = flip_direction
+        self.dimension = dimension
+        self.calculate_origin_from_dimension = calculate_origin_from_dimension
+
+class JointCharacteristics: 
+    def __init__(self, offset = 0.0, take_half_length = False, flip_direction = True) -> None:
+        self.offset = offset
+        self.take_half_length = take_half_length
+        self.flip_direction = flip_direction
 
 class Geometry(Enum):
     """The different types of geometries that constitute the URDF"""
@@ -41,11 +54,12 @@ class Side(Enum):
 
 
 class linkParametric:
-    def __init__(self, link_name: str, length_multiplier, density, robot, link) -> None:
+    def __init__(self, link_name: str, length_multiplier, density, robot, link, link_characteristics) -> None:
         self.name = link_name
         self.density = density
         self.length_multiplier = length_multiplier
         self.link = link
+        self.link_characteristic = link_characteristics
         self.geometry_type, self.visual_data = self.get_geometry(self.get_visual())
         (self.volume, self.visual_data_new) = self.compute_volume()
         self.mass = self.compute_mass()
@@ -53,6 +67,8 @@ class linkParametric:
         self.origin = self.modify_origin()
         # Find better way to deal with the inertial
         self.inertial = self.I
+
+
     def get_visual(self):
         """Returns the visual object of a link"""
         return self.link.visuals[0]
@@ -68,19 +84,22 @@ class linkParametric:
             return [Geometry.SPHERE, visual_obj.geometry.sphere]
 
     """Function that starting from a multiplier (casadi variable) and link visual characteristics computes the link volume"""
+        
 
     def compute_volume(self):
         volume = cs.SX.zeros(1)
         """Modifies a link's volume by a given multiplier, in a manner that is logical with the link's geometry"""
         if self.geometry_type == Geometry.BOX:
             visual_data_new = cs.SX.zeros(3)
-            if self.link.dimension == Side.WIDTH:
+            for i in range(2):
+                visual_data_new[i] = self.visual_data.size[i]
+            if self.link_characteristic.dimension == Side.WIDTH:
                 visual_data_new[0] = self.visual_data.size[0] * self.length_multiplier
-            elif self.link.dimension == Side.HEIGHT:
+            elif self.link_characteristic.dimension == Side.HEIGHT:
                 visual_data_new[1] = self.visual_data.size[1] * self.length_multiplier
-            elif self.link.dimension == Side.DEPTH:
+            elif self.link_characteristic.dimension == Side.DEPTH:
                 visual_data_new[2] = self.visual_data.size[2] * self.length_multiplier
-            volume = self.visual_data_new[0] * visual_data_new[1] * visual_data_new[2]
+            volume = visual_data_new[0] * visual_data_new[1] * visual_data_new[2]
         elif self.geometry_type == Geometry.CYLINDER:
             visual_data_new = cs.SX.zeros(2)
             visual_data_new[0] = self.visual_data.length * self.length_multiplier
@@ -110,15 +129,21 @@ class linkParametric:
 
         if self.geometry_type == Geometry.BOX:
             "For now hardcoded could be then changed Correspictive line in ergocub gazebo simulator --> check for modifyOrigin"
-            "if (self.link.dimension == Side.DEPTH):"
-            index_to_change = 2
-            "if (self.calculate_origin_from_dimensions):"
-            xyz_rpy[index_to_change] = (self.visual_data_new.size[index_to_change]) / 2
-            "else:"
-            "xyz_rpy[index_to_change] = 0"
-            "xyz_rpy[index_to_change] += self.origin_modifier"
+            if (self.link_characteristic.dimension == Side.DEPTH):
+                index_to_change = 2
+            elif(self.link_characteristic.dimenison == Side.WIDTH):
+                index_to_change = 0
+            elif(self.link_characteristic.dimension == Side.HEIGHT):
+                index_to_change = 1
+
+            if(self.link_characteristic.calculate_origin_from_dimension):
+                xyz_rpy[index_to_change] = (self.visual_data_new[index_to_change] if not self.link_characteristic.flip_direction else -self.visual_data_new.size[index_to_change]) / 2
+            else:
+                xyz_rpy[index_to_change] = 0
+            xyz_rpy[index_to_change] += self.link_characteristic.offset
+            origin = xyz_rpy
         elif self.geometry_type == Geometry.CYLINDER:
-            origin[2] = -self.visual_data_new[0] / 2
+            origin[2] = -self.visual_data_new[0] / 2 + self.link_characteristic.offset
             origin[0] = xyz_rpy[0]
             origin[1] = xyz_rpy[1]
             origin[3] = xyz_rpy[3]
@@ -126,7 +151,7 @@ class linkParametric:
             origin[5] = xyz_rpy[5]
         elif self.geometry_type == Geometry.SPHERE:
             "in case of a sphere the origin of the frame does not change"
-            xyz_rpy = xyz_rpy
+            origin = xyz_rpy
         return origin
 
     def compute_inertia_parametric(self):
@@ -152,7 +177,7 @@ class linkParametric:
             I.izz = I.ixx
         elif self.geometry_type == Geometry.CYLINDER:
             i_xy_incomplete = (
-                3 ** self.visual_data_new[1] ** 2 + self.visual_data_new[0] ** 2
+                3 *(self.visual_data_new[1] ** 2) + self.visual_data_new[0] ** 2
             ) / 12
             I.ixx = self.mass * i_xy_incomplete
             I.iyy = self.mass * i_xy_incomplete
@@ -168,22 +193,34 @@ class linkParametric:
         if self.geometry_type == Geometry.CYLINDER:
             return self.visual_data_new[0]
         elif self.geometry_type == Geometry.BOX:
-            return self.visual_data_new[2]
+            if (self.link_characteristic.dimension == Side.DEPTH):
+                index = 2
+            elif(self.link_characteristic.dimenison == Side.WIDTH):
+                index = 0
+            elif(self.link_characteristic.dimension == Side.HEIGHT):
+                index = 1
+            return self.visual_data_new[index]
         else:
             "TODO understand why in case of sphere it is zero, most likely because things does not change"
             return 0
 
 
 class jointParametric:
-    def __init__(self, joint_name, parent_link, joint) -> None:
+    def __init__(self, joint_name, parent_link, joint, joint_characteristic) -> None:
         self.jointName = joint_name
         self.parent_link_name = parent_link
         self.joint = joint
         self.parent_link = parent_link
+        self.jointCharacteristic  = joint_characteristic
         self.origin = self.modify()
+        
 
     def modify(self):
         length = self.parent_link.get_principal_length()
         xyz_rpy = cs.SX(matrix_to_xyz_rpy(self.joint.origin))
-        xyz_rpy[2] = length
+        xyz_rpy[2] = length / (2 if self.jointCharacteristic.take_half_length else 1)
+        if self.jointCharacteristic.flip_direction:
+            xyz_rpy[2] *= -1
+        xyz_rpy[2] +=  self.jointCharacteristic.offset
+
         return xyz_rpy

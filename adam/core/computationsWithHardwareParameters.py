@@ -46,8 +46,10 @@ class KinDynComputationsWithHardwareParameters:
         self,
         urdfstring: str,
         joints_name_list: list,
-        link_name_list: list,
+        link_name_list: list, 
         root_link: str = "root_link",
+        link_characteristic = None, 
+        joint_characteristic = None,
         gravity: np.array = np.array([0, 0, -9.80665, 0, 0, 0]),
         f_opts: dict = dict(jit=False, jit_options=dict(flags="-Ofast")),
     ) -> None:
@@ -68,6 +70,8 @@ class KinDynComputationsWithHardwareParameters:
         self.link_name_list = link_name_list
         self.NDoF = len(self.joints_list)
         self.root_link = root_link
+        self.link_characteristic = link_characteristic
+        self.joint_characteristic = joint_characteristic
         self.g = gravity
         self.f_opts = f_opts
         (
@@ -90,6 +94,23 @@ class KinDynComputationsWithHardwareParameters:
             raise error("Some joints are not in the URDF")
         return joints_list
 
+
+    def findLinkCharacteristic(self, name):
+        if(self.link_characteristic is None): 
+            return linkParametric.LinkCharacteristics()
+        for key, val in self.link_characteristic.items():
+            if(key == name):
+               return val
+        return linkParametric.LinkCharacteristics()
+
+    def findJointCharacteristic(self, name):
+        if(self.joint_characteristic is None): 
+            return linkParametric.JointCharacteristics()
+        for key, val in self.joint_characteristic.items():
+            if(key == name):
+               return val
+        return linkParametric.JointCharacteristics()
+        
     def load_model(self):
         """This function computes the branched tree graph.
 
@@ -193,7 +214,8 @@ class KinDynComputationsWithHardwareParameters:
                 link_original = self.get_element_by_name(self.tree.links[i].name, self.robot)
                 j = self.link_name_list.index(self.tree.links[i].name)
                 #TODO it should be done only at initialization
-                link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original)
+                link_char = self.findLinkCharacteristic(self.tree.links[i].name)
+                link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original,link_char)
                 I = link_i.I
                 mass = link_i.mass 
                 o = cs.SX.zeros(3)
@@ -212,13 +234,14 @@ class KinDynComputationsWithHardwareParameters:
                 Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
             if self.tree.parents[i].name in self.link_name_list: 
                 link_original_parent = self.get_element_by_name(self.tree.parents[i].name, self.robot)  
-                print(self.tree.parents[i].name) 
                 # Joint Part 
                 joint_i = self.tree.joints[i]
                 j = self.link_name_list.index(self.tree.parents[i].name)
                 #TODO it should be done only at initialization
-                link_i_parametric = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original_parent)
-                joint_i_param = linkParametric.jointParametric(joint_i.name,link_i_parametric, joint_i)
+                link_char = self.findLinkCharacteristic(self.tree.parents[i].name)
+                joint_char = self.findJointCharacteristic(self.tree.joints[i].name)
+                link_i_parametric = linkParametric.linkParametric(self.tree.parents[i].name, length_multiplier[j],density[j],self.robot,link_original_parent, link_char)
+                joint_i_param = linkParametric.jointParametric(joint_i.name,link_i_parametric, joint_i, joint_char)
                 o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
                 rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
             else:
@@ -378,8 +401,10 @@ class KinDynComputationsWithHardwareParameters:
                     link_original = self.get_element_by_name(self.tree.parents[i].name, self.robot)
                     j = self.link_name_list.index(self.tree.parents[i].name)
                     #TODO it should be done only at initialization
-                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, lenght_multiplier[j],density[j],self.robot,link_original)
-                    joint_i_param = linkParametric.jointParametric(item,link_i, joint)
+                    link_char = self.findLinkCharacteristic(self.tree.parents[i].name)
+                    joint_char = self.findJointCharacteristic(item)
+                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, lenght_multiplier[j],density[j],self.robot,link_original, link_char)
+                    joint_i_param = linkParametric.jointParametric(item,link_i, joint, joint_char)
                     o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
                     rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
                 else: 
@@ -439,8 +464,10 @@ class KinDynComputationsWithHardwareParameters:
                     link_original = self.get_element_by_name(self.tree.parents[i].name, self.robot)
                     j = self.link_name_list.index(self.tree.parents[i].name)
                     #TODO it should be done only at initialization
-                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, length_multiplier[j],density[j],self.robot,link_original)
-                    joint_i_param = linkParametric.jointParametric(item,link_i, joint)
+                    link_char  = self.findLinkCharacteristic(self.tree.parents[i].name)
+                    joint_char = self.findJointCharacteristic(item)
+                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, length_multiplier[j],density[j],self.robot,link_original,link_char)
+                    joint_i_param = linkParametric.jointParametric(item,link_i, joint, joint_char)
                     o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
                     rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
                 else:
@@ -510,8 +537,10 @@ class KinDynComputationsWithHardwareParameters:
                     link_original = self.get_element_by_name(self.tree.parents[i].name, self.robot)
                     j = self.link_name_list.index(self.tree.parents[i].name)
                     #TODO it should be done only at initialization
-                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, length_multiplier[j],density[j],self.robot,link_original)
-                    joint_i_param = linkParametric.jointParametric(item,link_i, joint)
+                    link_char = self.findLinkCharacteristic(self.tree.parents[i].name)
+                    joint_char = self.findJointCharacteristic(item)
+                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, length_multiplier[j],density[j],self.robot,link_original,link_char)
+                    joint_i_param = linkParametric.jointParametric(item,link_i, joint, joint_char)
                     o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
                     rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
                 else:
@@ -561,7 +590,8 @@ class KinDynComputationsWithHardwareParameters:
                 link_original = self.get_element_by_name(item, self.robot)
                 j = self.link_name_list.index(item)
                 #TODO it should be done only at initialization
-                link = linkParametric.linkParametric(item, length_multiplier[j],density[j],self.robot,link_original)
+                link_char = self.findLinkCharacteristic(item)
+                link = linkParametric.linkParametric(item, length_multiplier[j],density[j],self.robot,link_original,link_char)
                 origin = link.origin; 
                 o = [origin[0],origin[1], origin[2]]
                 rpy = [origin[3], origin[4], origin[5]]
@@ -602,7 +632,8 @@ class KinDynComputationsWithHardwareParameters:
             if item in self.link_name_list: 
                 j = self.link_name_list.index(item)
                 link_original = self.robot_desc.link_map[item]
-                link_parametric = linkParametric.linkParametric(item, length_multiplier[j],density[j],self.robot,link_original) 
+                link_char = self.findLinkCharacteristic(item)
+                link_parametric = linkParametric.linkParametric(item, length_multiplier[j],density[j],self.robot,link_original, link_char) 
                 mass += link_parametric.mass
             else:
                 link = self.robot_desc.link_map[item]
@@ -653,7 +684,8 @@ class KinDynComputationsWithHardwareParameters:
                 link_original = self.get_element_by_name(self.tree.links[i].name, self.robot)
                 j = self.link_name_list.index(self.tree.links[i].name)
                 #TODO it should be done only at initialization
-                link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original)
+                link_char = self.findLinkCharacteristic(self.tree.links[i].name)
+                link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original, link_char)
                 I = link_i.I
                 mass = link_i.mass 
                 o = cs.SX.zeros(3)
@@ -676,8 +708,10 @@ class KinDynComputationsWithHardwareParameters:
                 joint_i = self.tree.joints[i]
                 j = self.link_name_list.index(self.tree.parents[i].name)
                 #TODO it should be done only at initialization
-                link_i_parametric = linkParametric.linkParametric(link_pi.name, length_multiplier[j],density[j],self.robot,link_pi)
-                joint_i_param = linkParametric.jointParametric(joint_i.name,link_i_parametric, joint_i)
+                link_char = self.findLinkCharacteristic(link_pi.name)
+                joint_char = self.findJointCharacteristic(joint_i.name)
+                link_i_parametric = linkParametric.linkParametric(link_pi.name, length_multiplier[j],density[j],self.robot,link_pi, link_char)
+                joint_i_param = linkParametric.jointParametric(joint_i.name,link_i_parametric, joint_i, joint_char)
                 o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
                 rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
             else:
