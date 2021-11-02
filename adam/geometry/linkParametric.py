@@ -54,7 +54,7 @@ class Side(Enum):
 
 
 class linkParametric:
-    def __init__(self, link_name: str, length_multiplier, density, robot, link, link_characteristics) -> None:
+    def __init__(self, link_name: str, length_multiplier, density, robot, link, link_characteristics = LinkCharacteristics()) -> None:
         self.name = link_name
         self.density = density
         self.length_multiplier = length_multiplier
@@ -107,10 +107,8 @@ class linkParametric:
             volume = math.pi * visual_data_new[1] ** 2 * visual_data_new[0]
         elif self.geometry_type == Geometry.SPHERE:
             visual_data_new = cs.SX.zeros(1)
-            visual_data_new = self.visual_data.radius * self.length_multiplier ** (
-                1.0 / 3
-            )
-            volume = 4 * math.pi * self.visual_data_new ** 3 / 3
+            visual_data_new = self.visual_data.radius * self.length_multiplier
+            volume = 4 * math.pi * visual_data_new ** 3 / 3
         return volume, visual_data_new
 
     """Function that computes the mass starting from the density, the length multiplier and the link"""
@@ -138,8 +136,6 @@ class linkParametric:
 
             if(self.link_characteristic.calculate_origin_from_dimension):
                 xyz_rpy[index_to_change] = (self.visual_data_new[index_to_change] if not self.link_characteristic.flip_direction else -self.visual_data_new.size[index_to_change]) / 2
-            else:
-                xyz_rpy[index_to_change] = 0
             xyz_rpy[index_to_change] += self.link_characteristic.offset
             origin = xyz_rpy
         elif self.geometry_type == Geometry.CYLINDER:
@@ -159,22 +155,9 @@ class linkParametric:
         """Calculates inertia (ixx, iyy and izz) with the formula that corresponds to the geometry
         Formulas retrieved from https://en.wikipedia.org/wiki/List_of_moments_of_inertia"""
         if self.geometry_type == Geometry.BOX:
-            I.ixx = (
-                self.mass
-                / 12
-                * (
-                    [
-                        self.visual_data_new.size[1] ** 2
-                        + self.visual_data_new.size[2] ** 2,
-                        self.visual_data_new.size[0] ** 2
-                        + self.visual_data_new.size[2] ** 2,
-                        self.visual_data_new.size[0] ** 2
-                        + self.visual_data_new.size[1] ** 2,
-                    ]
-                )
-            )
-            I.iyy = I.ixx
-            I.izz = I.ixx
+            I.ixx = self.mass * (self.visual_data_new[1] ** 2+ self.visual_data_new[2] ** 2)/12
+            I.iyy = self.mass* (self.visual_data_new[0]**2 + self.visual_data_new[2]**2)/12
+            I.izz = self.mass * (self.visual_data_new[0]**2 + self.visual_data_new[1]**2)/12
         elif self.geometry_type == Geometry.CYLINDER:
             i_xy_incomplete = (
                 3 *(self.visual_data_new[1] ** 2) + self.visual_data_new[0] ** 2
@@ -184,7 +167,7 @@ class linkParametric:
             I.izz = self.mass * self.visual_data_new[1] ** 2 / 2
             return I
         elif self.geometry_type == Geometry.SPHERE:
-            I.ixx = 2 * self.mass * self.visual_data_new[0] ** 2 / 5
+            I.ixx = 2 * self.mass * self.visual_data_new** 2 / 5
             I.iyy = I.ixx
             I.izz = I.ixx
         return I

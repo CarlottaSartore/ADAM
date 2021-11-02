@@ -94,7 +94,6 @@ class KinDynComputationsWithHardwareParameters:
             raise error("Some joints are not in the URDF")
         return joints_list
 
-
     def findLinkCharacteristic(self, name):
         if(self.link_characteristic is None): 
             return linkParametric.LinkCharacteristics()
@@ -218,6 +217,7 @@ class KinDynComputationsWithHardwareParameters:
                 link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original,link_char)
                 I = link_i.I
                 mass = link_i.mass 
+                origin = link_i.origin
                 o = cs.SX.zeros(3)
                 o[0] = origin[0]
                 o[1] = origin[1]
@@ -225,13 +225,14 @@ class KinDynComputationsWithHardwareParameters:
                 rpy = [link_i.origin[3],link_i.origin[4],link_i.origin[5]]
                 Ic[i] = utils.spatial_inertial_with_parameter(I,mass,o,rpy)
             else: 
+                
                 link_i = self.tree.links[i]
                 I = link_i.inertial.inertia
                 mass = link_i.inertial.mass
                 origin = urdfpy.matrix_to_xyz_rpy(link_i.inertial.origin)
                 o = [origin[0],origin[1], origin[2]]
                 rpy = [origin[3], origin[4], origin[5]]
-                Ic[i] = utils.spatial_inertia(I, mass, o, rpy)
+                Ic[i] = utils.spatial_inertia(I, mass, o, rpy)                    
             if self.tree.parents[i].name in self.link_name_list: 
                 link_original_parent = self.get_element_by_name(self.tree.parents[i].name, self.robot)  
                 # Joint Part 
@@ -246,27 +247,25 @@ class KinDynComputationsWithHardwareParameters:
                 rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
             else:
                 joint_i = self.tree.joints[i]
-                # start joint 
-                if joint_i.idx is not None:
-                    ## Check
-                    origin_joint = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
-                    o_joint = cs.SX.zeros(3)
-                    rpy_joint = cs.SX.zeros(3)
-                    o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
-                    rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
-                else: 
-                    o_joint = [0.0, 0.0, 0.0]
-                    rpy_joint = [0.0, 0.0, 0.]
-                # end joint    
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
                 X_p[i] = utils.spatial_transform(np.eye(3), np.zeros(3))
                 Phi[i] = cs.np.eye(6)
             elif joint_i.joint_type == "fixed":
+                origin_joint = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
+                o_joint = cs.SX.zeros(3)
+                rpy_joint = cs.SX.zeros(3)
+                o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
                 X_J = utils.X_fixed_joint(o_joint, rpy_joint)
                 X_p[i] = X_J
                 Phi[i] = cs.vertcat(0, 0, 0, 0, 0, 0)
             elif joint_i.joint_type == "revolute" or joint_i.joint_type == "continuous":
+                origin_joint = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
+                o_joint = cs.SX.zeros(3)
+                rpy_joint = cs.SX.zeros(3)
+                o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
                 if joint_i.idx is not None:
                     q_ = q[joint_i.idx]
                 else:
@@ -847,3 +846,11 @@ class KinDynComputationsWithHardwareParameters:
             return link_list[0]
         else:
             return None
+    
+    @staticmethod
+    def get_joint_by_name(joint_name, robot): 
+        joint_list = [corresponding_joint for corresponding_joint in robot.joints if corresponding_joint.name == joint_name]
+        if len(joint_list) != 0: 
+            return joint_list[0]
+        else: 
+            return None 

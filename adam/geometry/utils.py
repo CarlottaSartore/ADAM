@@ -102,7 +102,6 @@ def spatial_inertia(I, mass, c, rpy):
     return IO
 
 def spatial_inertial_with_parameter(I, mass,c,rpy):
-
     # Returns the 6x6 inertia matrix expressed at the origin of the link (with rotation)"""
     IO = cs.SX.zeros(6,6)
     Sc = cs.skew(c)
@@ -110,7 +109,7 @@ def spatial_inertial_with_parameter(I, mass,c,rpy):
     R_temp = R_from_RPY(rpy)    
     #TODO
     inertia_matrix =cs.vertcat(cs.horzcat(I.ixx,0.0, 0.0), cs.horzcat(0.0, I.iyy, 0.0), cs.horzcat(0.0, 0.0, I.izz))
-    IO[3:, 3:] = R@inertia_matrix@R.T + mass * cs.mtimes(Sc,Sc.T)
+    IO[3:, 3:] = R_temp@inertia_matrix@R_temp.T + mass * cs.mtimes(Sc,Sc.T)
     IO[3:, :3] = mass * Sc
     IO[:3, 3:] = mass * Sc.T
     IO[:3, :3] = cs.SX.eye(3)* mass
