@@ -190,7 +190,7 @@ class KinDynComputationsWithHardwareParameters:
         logging.debug(table_joints)
         return links, frames, joints, tree
     
-    # Done
+    # Done No Regression Passed
     def crba(self):
         """This function computes the Composite Rigid body algorithm (Roy Featherstone) that computes the Mass Matrix.
          The algorithm is complemented with Orin's modifications computing the Centroidal Momentum Matrix
@@ -352,7 +352,7 @@ class KinDynComputationsWithHardwareParameters:
         Jcm = cs.Function("Jcm", [T_b, q, density, length_multiplier], [Jcc], self.f_opts)
         return M, Jcm
     
-    # Done
+    # Done No Regression Passed
     def mass_matrix_fun(self):
         """Returns the Mass Matrix functions computed the CRBA
 
@@ -362,7 +362,7 @@ class KinDynComputationsWithHardwareParameters:
         [M, _] = self.crba()
         return M
 
-    # Done
+    # Done No Regression Passed
     def centroidal_momentum_matrix_fun(self):
         """Returns the Centroidal Momentum Matrix functions computed the CRBA
 
@@ -372,7 +372,7 @@ class KinDynComputationsWithHardwareParameters:
         [_, Jcm] = self.crba()
         return Jcm
     
-    # Done
+    # Done No Regression Passed
     def forward_kinematics_fun(self, frame):
         """Computes the forward kinematics relative to the specified frame
 
@@ -586,7 +586,7 @@ class KinDynComputationsWithHardwareParameters:
         com_pos = cs.SX.zeros(3, 1)
         for item in self.robot_desc.link_map:
             if item in self.link_name_list:
-                link_original = self.get_element_by_name(item, self.robot)
+                link_original = self.robot_desc.link_map[item]
                 j = self.link_name_list.index(item)
                 #TODO it should be done only at initialization
                 link_char = self.findLinkCharacteristic(item)
@@ -687,6 +687,7 @@ class KinDynComputationsWithHardwareParameters:
                 link_i = linkParametric.linkParametric(self.tree.links[i].name, length_multiplier[j],density[j],self.robot,link_original, link_char)
                 I = link_i.I
                 mass = link_i.mass 
+                origin = link_i.origin
                 o = cs.SX.zeros(3)
                 o[0] = origin[0]
                 o[1] = origin[1]
@@ -716,17 +717,17 @@ class KinDynComputationsWithHardwareParameters:
             else:
                 joint_i = self.tree.joints[i]
                 # start joint 
-                if joint_i.idx is not None:
+                # if joint_i.idx is not None:
                     ## Check
-                    origin_joint = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
-                    o_joint = cs.SX.zeros(3)
-                    rpy_joint = cs.SX.zeros(3)
-                    o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
-                    rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
-                else: 
-                    o_joint = [0.0, 0.0, 0.0]
-                    rpy_joint = [0.0, 0.0, 0.]
-                # end joint    
+                # origin_joint = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
+                # o_joint = cs.SX.zeros(3)
+                # rpy_joint = cs.SX.zeros(3)
+                # o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                # rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
+                # else: 
+                #     o_joint = [0.0, 0.0, 0.0]
+                #     rpy_joint = [0.0, 0.0, 0.]
+                # # end joint    
             # I = link_i.inertial.inertia
             # mass = link_i.inertial.mass
             # o = link_i.inertial.origin.xyz
@@ -739,11 +740,21 @@ class KinDynComputationsWithHardwareParameters:
                 Phi[i] = cs.np.eye(6)
                 v_J = Phi[i] @ X_to_mixed @ v_b
             elif joint_i.joint_type == "fixed":
+                origin_joint = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
+                o_joint = cs.SX.zeros(3)
+                rpy_joint = cs.SX.zeros(3)
+                o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
                 X_J = utils.X_fixed_joint(o_joint, rpy_joint)
                 X_p[i] = X_J
                 Phi[i] = cs.vertcat(0, 0, 0, 0, 0, 0)
                 v_J = cs.SX.zeros(6, 1)
             elif joint_i.joint_type == "revolute" or joint_i.joint_type == "continuous":
+                origin_joint = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
+                o_joint = cs.SX.zeros(3)
+                rpy_joint = cs.SX.zeros(3)
+                o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
                 if joint_i.idx is not None:
                     q_ = q[joint_i.idx]
                     q_dot_ = q_dot[joint_i.idx]
