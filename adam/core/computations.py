@@ -318,7 +318,7 @@ class KinDynComputations:
                     rpy = joint.origin.rpy
                     joint_frame = utils.H_from_PosRPY(xyz, rpy)
                     T_fk = T_fk @ joint_frame
-                if joint.type == "revolute":
+                if joint.type == "revolute" or joint.type == "continuous":
                     # if the joint is actuated set the value
                     if joint.idx is not None:
                         q_ = q[joint.idx]
@@ -360,7 +360,7 @@ class KinDynComputations:
                     rpy = joint.origin.rpy
                     joint_frame = utils.H_from_PosRPY(xyz, rpy)
                     T_fk = T_fk @ joint_frame
-                if joint.type == "revolute":
+                if joint.type == "revolute" or joint.type == "continuous":
                     if joint.idx is not None:
                         q_ = q[joint.idx]
                     else:
