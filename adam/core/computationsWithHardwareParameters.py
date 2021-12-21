@@ -224,6 +224,10 @@ class KinDynComputationsWithHardwareParameters:
                 o[2] = origin[2]
                 rpy = [link_i.origin[3],link_i.origin[4],link_i.origin[5]]
                 Ic[i] = utils.spatial_inertial_with_parameter(I,mass,o,rpy)
+                print("inside the crba link parametric")
+                print("I", I)
+                print('origin', origin)
+                print("Ic", Ic)
             else: 
                 
                 link_i = self.tree.links[i]
@@ -431,6 +435,64 @@ class KinDynComputationsWithHardwareParameters:
                     
                     T_fk = T_fk @ T_joint               
         T_fk = cs.Function("T_fk", [T_b, q, density, lenght_multiplier], [T_fk], self.f_opts)
+        return T_fk
+
+    def relative_forward_kinematics_fun(self, frame_1,frame_2):
+        """Computes the forward kinematics relative to the specified frame
+
+        Args:
+            frame (str): The frame to which the fk will be computed
+
+        Returns:
+            T_fk (casADi function): The fk represented as Homogenous transformation matrix
+        """
+        chain = self.robot_old.get_chain(frame_1, frame_2)
+        self.robot_desc
+        q = cs.SX.sym("q", self.NDoF)
+        density = cs.SX.sym("density", len(self.link_name_list))
+        lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+        T_fk = cs.SX.eye(4)
+        # for item in self.tree.joints: 
+            # print(item.name)
+        for item in chain:
+            if item in self.robot_desc.joint_map:
+                i = self.tree.joints.index(self.robot_desc.joint_map[item])
+                if(self.tree.parents[i].name in self.link_name_list): 
+                    joint= self.robot_desc.joint_map[item]
+                    link_original = self.get_element_by_name(self.tree.parents[i].name, self.robot)
+                    j = self.link_name_list.index(self.tree.parents[i].name)
+                    #TODO it should be done only at initialization
+                    link_char = self.findLinkCharacteristic(self.tree.parents[i].name)
+                    joint_char = self.findJointCharacteristic(item)
+                    link_i = linkParametric.linkParametric(self.tree.parents[i].name, lenght_multiplier[j],density[j],self.robot,link_original, link_char)
+                    joint_i_param = linkParametric.jointParametric(item,link_i, joint, joint_char)
+                    o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
+                    rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
+                else: 
+                    joint = self.robot_desc.joint_map[item]
+                    origin_joint = urdfpy.matrix_to_xyz_rpy(joint.origin)
+                    o_joint = [origin_joint[0], origin_joint[1], origin_joint[2]]
+                    rpy_joint = [origin_joint[3], origin_joint[4], origin_joint[5]]
+                if joint.joint_type == "fixed":
+                    xyz = o_joint
+                    rpy = rpy_joint
+                    joint_frame = utils.H_from_PosRPY(xyz, rpy)
+                    T_fk = T_fk @ joint_frame
+                if joint.joint_type == "revolute" or joint.joint_type =="continuous" :
+                    # if the joint is actuated set the value
+                    if joint.idx is not None:
+                        q_ = q[joint.idx]
+                    else:
+                        q_ = 0.0
+                    T_joint = utils.H_revolute_joint(
+                        o_joint,
+                        rpy_joint,
+                        joint.axis,
+                        q_,
+                    )
+                    
+                    T_fk = T_fk @ T_joint               
+        T_fk = cs.Function("T_fk", [q, density, lenght_multiplier], [T_fk], self.f_opts)
         return T_fk
 
     # Done
@@ -641,6 +703,37 @@ class KinDynComputationsWithHardwareParameters:
 
         mass = cs.Function("mass", [density, length_multiplier], [mass],self.f_opts )            
         return mass
+
+    def get_link_mass(self, link_name):
+        if link_name in self.link_name_list:
+            length_multiplier = cs.SX.sym("length_multiplier",1)
+            density = cs.SX.sym("density",1)
+            j = self.link_name_list.index(link_name)
+            link_original = self.robot_desc.link_map[link_name]
+            link_char = self.findLinkCharacteristic(link_name)
+            link_parametric = linkParametric.linkParametric(link_name, length_multiplier,density,self.robot,link_original, link_char) 
+            mass = link_parametric.mass
+            mass = cs.Function("mass", [density, length_multiplier], [mass], self.f_opts)
+            return mass 
+        else:
+            link = self.robot_desc.link_map[link_name]
+            return link.inertial.mass 
+            
+    def get_link_volume(self,link_name): 
+        if link_name in self.link_name_list:
+            length_multiplier = cs.SX.sym("length_multiplier",1)
+            density = cs.SX.sym("density",1)
+            j = self.link_name_list.index(link_name) 
+            link_original = self.robot_desc.link_map[link_name]
+            link_char = self.findLinkCharacteristic(link_name)
+            link_parametric = linkParametric.linkParametric(link_name, length_multiplier,density,self.robot,link_original, link_char) 
+            volume = link_parametric.volume
+            volume = cs.Function("volume",[density, length_multiplier], [volume], self.f_opts )
+            return volume 
+        else: 
+            print("warning not yet implemented get volume for generic link")
+            return 
+
 
     def rnea(self):
         """Implementation of reduced Recursive Newton-Euler algorithm

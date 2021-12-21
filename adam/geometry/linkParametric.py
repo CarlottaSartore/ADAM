@@ -32,10 +32,11 @@ class LinkCharacteristics:
         self.calculate_origin_from_dimension = calculate_origin_from_dimension
 
 class JointCharacteristics: 
-    def __init__(self, offset = 0.0, take_half_length = False, flip_direction = True) -> None:
+    def __init__(self, offset = 0.0, take_half_length = False, flip_direction = True, modify_origin = True) -> None:
         self.offset = offset
         self.take_half_length = take_half_length
         self.flip_direction = flip_direction
+        self.modify_origin = modify_origin
 
 class Geometry(Enum):
     """The different types of geometries that constitute the URDF"""
@@ -93,11 +94,11 @@ class linkParametric:
             visual_data_new = cs.SX.zeros(3)
             for i in range(2):
                 visual_data_new[i] = self.visual_data.size[i]
-            if self.link_characteristic.dimension == Side.WIDTH:
-                visual_data_new[0] = self.visual_data.size[0] * self.length_multiplier
-            elif self.link_characteristic.dimension == Side.HEIGHT:
-                visual_data_new[1] = self.visual_data.size[1] * self.length_multiplier
-            elif self.link_characteristic.dimension == Side.DEPTH:
+            # if self.link_characteristic.dimension == Side.WIDTH:
+            #     visual_data_new[0] = self.visual_data.size[0] * self.length_multiplier
+            # elif self.link_characteristic.dimension == Side.HEIGHT:
+            #     visual_data_new[1] = self.visual_data.size[1] * self.length_multiplier
+            # elif self.link_characteristic.dimension == Side.DEPTH:
                 visual_data_new[2] = self.visual_data.size[2] * self.length_multiplier
             volume = visual_data_new[0] * visual_data_new[1] * visual_data_new[2]
         elif self.geometry_type == Geometry.CYLINDER:
@@ -127,17 +128,29 @@ class linkParametric:
 
         if self.geometry_type == Geometry.BOX:
             "For now hardcoded could be then changed Correspictive line in ergocub gazebo simulator --> check for modifyOrigin"
+            index_to_change = 2 
             if (self.link_characteristic.dimension == Side.DEPTH):
                 index_to_change = 2
-            elif(self.link_characteristic.dimenison == Side.WIDTH):
+            elif(self.link_characteristic.dimension == Side.WIDTH):
                 index_to_change = 0
             elif(self.link_characteristic.dimension == Side.HEIGHT):
                 index_to_change = 1
 
             if(self.link_characteristic.calculate_origin_from_dimension):
-                xyz_rpy[index_to_change] = (self.visual_data_new[index_to_change] if not self.link_characteristic.flip_direction else -self.visual_data_new.size[index_to_change]) / 2
-            xyz_rpy[index_to_change] += self.link_characteristic.offset
-            origin = xyz_rpy
+                print("original origin", xyz_rpy)
+                print("index prior to change", xyz_rpy[index_to_change])
+                print("visualData New", self.visual_data_new)
+                print("index to change", index_to_change)
+                a = self.visual_data_new[index_to_change]
+                print(a)
+                xyz_rpy[index_to_change] = a 
+                origin[2] = a 
+                print(origin)
+                # xyz_rpy[index_to_change] = self.visual_data_new[index_to_change] #if not self.link_characteristic.flip_direction else -self.visual_data_new[index_to_change]) / 2
+                print("index after change", xyz_rpy[2])
+            origin[2] += self.link_characteristic.offset
+            print("with offset", origin)
+            # origin = xyz_rpy
         elif self.geometry_type == Geometry.CYLINDER:
             origin[2] = -self.visual_data_new[0] / 2 + self.link_characteristic.offset
             origin[0] = xyz_rpy[0]
@@ -176,9 +189,10 @@ class linkParametric:
         if self.geometry_type == Geometry.CYLINDER:
             return self.visual_data_new[0]
         elif self.geometry_type == Geometry.BOX:
+            index = 2
             if (self.link_characteristic.dimension == Side.DEPTH):
                 index = 2
-            elif(self.link_characteristic.dimenison == Side.WIDTH):
+            elif(self.link_characteristic.dimension == Side.WIDTH):
                 index = 0
             elif(self.link_characteristic.dimension == Side.HEIGHT):
                 index = 1
@@ -201,9 +215,10 @@ class jointParametric:
     def modify(self):
         length = self.parent_link.get_principal_length()
         xyz_rpy = cs.SX(matrix_to_xyz_rpy(self.joint.origin))
-        xyz_rpy[2] = length / (2 if self.jointCharacteristic.take_half_length else 1)
-        if self.jointCharacteristic.flip_direction:
-            xyz_rpy[2] *= -1
-        xyz_rpy[2] +=  self.jointCharacteristic.offset
+        if(self.jointCharacteristic.modify_origin):
+            xyz_rpy[2] = length / (2 if self.jointCharacteristic.take_half_length else 1)
+            if self.jointCharacteristic.flip_direction:
+                xyz_rpy[2] *= -1
+            xyz_rpy[2] +=  self.jointCharacteristic.offset
 
         return xyz_rpy
