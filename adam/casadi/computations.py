@@ -7,7 +7,7 @@ import numpy as np
 
 from adam.casadi.spatial_math_casadi import SpatialMathCasadi
 from adam.core.rbd_algorithms import RBDAlgorithms
-
+from adam.core.link_parametric import linkParametric
 
 class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
     """This is a small class that retrieves robot quantities represented in a symbolic fashion using CasADi
@@ -248,3 +248,41 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             # set in the bias force computation the velocity to zero
             G = super().rnea(T_b, q, np.zeros(6), np.zeros(self.NDoF),self.g, density, lenght_multiplier)
             return cs.Function("G", [T_b, q, density, lenght_multiplier], [G], self.f_opts)
+    
+    def get_link_mass(self, link_name):
+        if link_name in self.link_name_list:
+            length_multiplier = cs.SX.sym("length_multiplier",1)
+            density = cs.SX.sym("density",1)
+            j = self.link_name_list.index(link_name)
+            link_original = self.robot_desc.link_map[link_name]
+            link_char = self.findLinkCharacteristic(link_name)
+            link_parametric = linkParametric(link_name, length_multiplier,density,self.robot_desc,link_original, link_char) 
+            mass = link_parametric.mass
+            mass = cs.Function("mass", [density, length_multiplier], [mass], self.f_opts)
+            return mass 
+        else:
+            link = self.robot_desc.link_map[link_name]
+            return link.inertial.mass 
+            
+    def get_link_volume(self,link_name): 
+        if link_name in self.link_name_list:
+            length_multiplier = cs.SX.sym("length_multiplier",1)
+            density = cs.SX.sym("density",1)
+            j = self.link_name_list.index(link_name) 
+            link_original = self.robot_desc.link_map[link_name]
+            link_char = self.findLinkCharacteristic(link_name)
+            link_parametric = linkParametric(link_name, length_multiplier,density,self.robot_desc,link_original, link_char) 
+            volume = link_parametric.volume
+            volume = cs.Function("volume",[density, length_multiplier], [volume], self.f_opts )
+            return volume 
+        else: 
+            print("warning not yet implemented get volume for generic link")
+            return 
+
+    @staticmethod
+    def get_joint_by_name(joint_name, robot): 
+        joint_list = [corresponding_joint for corresponding_joint in robot.joints if corresponding_joint.name == joint_name]
+        if len(joint_list) != 0: 
+            return joint_list[0]
+        else: 
+            return None 
