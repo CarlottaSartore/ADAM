@@ -56,6 +56,19 @@ class SpatialMathCasadi(SpatialMathAbstract):
         T[2,3] = xyz[2]  
         return T
 
+    @classmethod 
+    def H_prismatic_joint(cls,xyz, rpy, axis,q ): 
+        T = cls.eye(4)
+        R = cls.R_from_RPY(rpy)
+        T[:3,:3] = R
+        q_incrementa = q*axis
+        T[0,3] = xyz[0] +q_incrementa[0]
+        T[1,3] = xyz[1] +q_incrementa[1]
+        T[2,3] = xyz[2] +q_incrementa[2] 
+        return T 
+        
+    
+
     @classmethod
     def H_from_Pos_RPY(cls, xyz, rpy):
         T = cls.eye(4)
@@ -73,6 +86,14 @@ class SpatialMathCasadi(SpatialMathAbstract):
     def X_revolute_joint(cls, xyz, rpy, axis, q):
         T = cls.H_revolute_joint(xyz, rpy, axis, q)
         R = T[:3, :3].T
+        p = -T[:3, :3].T @ T[:3, 3]
+        return cls.spatial_transform(R, p)
+    
+    @classmethod
+    def X_prismatic_joint(
+        cls,xyz,rpy,axis,q):
+        T = cls.H_prismatic_joint(xyz, rpy, axis, q)
+        R = T[:3,:3].T
         p = -T[:3, :3].T @ T[:3, 3]
         return cls.spatial_transform(R, p)
 

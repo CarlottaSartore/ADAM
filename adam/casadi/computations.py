@@ -19,6 +19,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
         urdfstring: str,
         joints_name_list: list,
         root_link: str = "root_link",
+        joint_type: np.array= None,
         link_name_list: list = [], 
         link_characteristics:dict = None,
         joint_characteristics:dict = None,
@@ -39,6 +40,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             joints_name_list=joints_name_list,
             root_link=root_link,
             gravity=gravity,
+            joint_type=joint_type,
             link_name_list=link_name_list,
             link_characteristics= link_characteristics, 
             joint_characteristics= joint_characteristics

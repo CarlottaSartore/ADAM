@@ -27,6 +27,7 @@ class RBDAlgorithms(SpatialMathAbstract):
         joints_name_list: list,
         root_link: str,
         gravity: np.array,
+        joint_type: np.array= None,
         link_name_list: list = [], 
         link_characteristics:dict = None,
         joint_characteristics:dict = None,
@@ -56,6 +57,7 @@ class RBDAlgorithms(SpatialMathAbstract):
         self.link_name_list = link_name_list
         self.link_characteristics = link_characteristics
         self.joint_characteristics = joint_characteristics
+        self.joint_type = joint_type
 
     @staticmethod
     def get_element_by_name(link_name, robot):
@@ -66,6 +68,23 @@ class RBDAlgorithms(SpatialMathAbstract):
         else:
             return None
     
+    def get_joint_type(self, joint_i): 
+        joint_type_i = ""
+        if(not(self.joint_type is None)): 
+            if(joint_i in self.joints_list): 
+                idx = self.joints_list.index(joint_i)
+                if(self.joint_type[idx] == 0): 
+                    joint_type_i = "revolute"
+                else: 
+                    joint_type_i = "prismatic"
+            else: 
+                if(hasattr(joint_i, "joint_type")): 
+                    return joint_i.joint_type
+        else: 
+            if(hasattr(joint_i, "joint_type")): 
+                return joint_i.joint_type
+        return joint_type_i 
+
     def findLinkCharacteristic(self, name):
         if(self.link_characteristics is None): 
             return link_parametric.LinkCharacteristics()
@@ -73,6 +92,9 @@ class RBDAlgorithms(SpatialMathAbstract):
             if(key == name):
                return val
         return link_parametric.LinkCharacteristics()
+
+    def set_jont_type(self, joint_type): 
+        self.joint_type = joint_type
 
     def findJointCharacteristic(self, name):
         if(self.joint_characteristics is None): 
@@ -102,15 +124,16 @@ class RBDAlgorithms(SpatialMathAbstract):
             [Ic_temp, o, rpy,_, link_i]= self.getLinkAttributes( i, length_multiplier, density)
             Ic[i] = Ic_temp
             [o_joint, rpy_joint,joint_i] = self.getJointAttributes(i, length_multiplier, density)
+            joint_type_i = self.get_joint_type(joint_i)
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
                 X_p[i] = self.spatial_transform(self.eye(3), self.zeros(3, 1))
                 Phi[i] = self.eye(6)
-            elif joint_i.joint_type == "fixed":
+            elif joint_type_i  == "fixed":
                 X_J = self.X_fixed_joint(o_joint, rpy_joint)
                 X_p[i] = X_J
                 Phi[i] = self.vertcat(0, 0, 0, 0, 0, 0)
-            elif joint_i.joint_type == "revolute" or joint_i.joint_type == "continuous":
+            elif joint_type_i  == "revolute" or joint_type_i == "continuous":
                 if joint_i.idx is not None:
                     q_ = joint_positions[joint_i.idx]
                 else:
@@ -129,6 +152,26 @@ class RBDAlgorithms(SpatialMathAbstract):
                     joint_i.axis[0],
                     joint_i.axis[1],
                     joint_i.axis[2],
+                )
+            elif joint_type_i == "prismatic":
+                if joint_i.idx is not None:
+                    q_ = joint_positions[joint_i.idx]
+                else:
+                    q_ = 0.0
+                X_J = self.X_prismatic_joint(
+                    o_joint,
+                    rpy_joint,
+                    joint_i.axis,
+                    q_,
+                )
+                X_p[i] = X_J
+                Phi[i] = self.vertcat(
+                    joint_i.axis[0],
+                    joint_i.axis[1],
+                    joint_i.axis[2],
+                    0.0,
+                    0.0,
+                    0.0,
                 )
 
         for i in range(self.tree.N - 1, -1, -1):
@@ -208,18 +251,32 @@ class RBDAlgorithms(SpatialMathAbstract):
             if item in self.robot_desc.joint_map:
                 i = self.tree.joints.index(self.robot_desc.joint_map[item])
                 [o_joint, rpy_joint,joint] = self.getJointAttributes(i, length_multiplier, density)
-                if joint.joint_type == "fixed":
+                joint_type_i = self.get_joint_type(joint)
+                if joint_type_i == "fixed":
                     xyz = o_joint
                     rpy = rpy_joint
                     joint_frame = self.H_from_Pos_RPY(xyz, rpy)
                     T_fk = T_fk @ joint_frame
-                if joint.joint_type == "revolute" or joint.joint_type == "continuous":
+                if joint_type_i == "revolute" or joint_type_i == "continuous":
                     # if the joint is actuated set the value
                     if joint.idx is not None:
                         q_ = joint_positions[joint.idx]
                     else:
                         q_ = 0.0
                     T_joint = self.H_revolute_joint(
+                        o_joint,
+                        rpy_joint,
+                        joint.axis,
+                        q_,
+                    )
+                    T_fk = T_fk @ T_joint
+                if joint_type_i == "prismatic":
+                    # if the joint is actuated set the value
+                    if joint.idx is not None:
+                        q_ = joint_positions[joint.idx]
+                    else:
+                        q_ = 0.0
+                    T_joint = self.H_prismatic_joint(
                         o_joint,
                         rpy_joint,
                         joint.axis,
@@ -247,20 +304,40 @@ class RBDAlgorithms(SpatialMathAbstract):
         P_ee = T_ee[:3, 3]
         for item in chain:
             if item in self.robot_desc.joint_map:
-
                 i = self.tree.joints.index(self.robot_desc.joint_map[item])
                 [o_joint, rpy_joint,joint] = self.getJointAttributes(i, length_multiplier, density)
-                if joint.joint_type == "fixed":
+                joint_type_i = self.get_joint_type(joint)
+                if joint_type_i == "fixed":
                     xyz = o_joint
                     rpy = rpy_joint
                     joint_frame = self.H_from_Pos_RPY(xyz, rpy)
                     T_fk = T_fk @ joint_frame
-                if joint.joint_type == "revolute" or joint.joint_type == "continuous":
+                if joint_type_i == "revolute" or joint_type_i == "continuous":
                     if joint.idx is not None:
                         q_ = joint_positions[joint.idx]
                     else:
                         q_ = 0.0
                     T_joint = self.H_revolute_joint(
+                        o_joint,
+                        rpy_joint,
+                        joint.axis,
+                        q_,
+                    )
+                    T_fk = T_fk @ T_joint
+                    p_prev = P_ee - T_fk[:3, 3]
+                    z_prev = T_fk[:3, :3] @ joint.axis
+                    # J[:, joint.idx] = self.vertcat(
+                    #     cs.jacobian(P_ee, joint_positions[joint.idx]), z_prev) # using casadi jacobian
+                    if joint.idx is not None:
+                        J[:, joint.idx] = self.vertcat(
+                            self.skew(z_prev) @ p_prev, z_prev
+                        )
+                if joint_type_i == "prismatic": 
+                    if joint.idx is not None:
+                        q_ = joint_positions[joint.idx]
+                    else:
+                        q_ = 0.0
+                    T_joint = self.H_prismatic_joint(
                         o_joint,
                         rpy_joint,
                         joint.axis,
@@ -306,12 +383,13 @@ class RBDAlgorithms(SpatialMathAbstract):
             if item in self.robot_desc.joint_map:
                 i = self.tree.joints.index(self.robot_desc.joint_map[item])
                 [o_joint, rpy_joint,joint] = self.getJointAttributes(i, length_multiplier, density)
-                if joint.joint_type == "fixed":
+                joint_type_i = self.get_joint_type(joint)
+                if joint_type_i == "fixed":
                     xyz = o_joint
                     rpy = rpy_joint
                     joint_frame = self.H_from_Pos_RPY(xyz, rpy)
                     T_fk = T_fk @ joint_frame
-                if joint.joint_type == "revolute" or joint.joint_type == "continuous":
+                if joint_type_i == "revolute" or joint_type_i == "continuous":
                     if joint.idx is not None:
                         q_ = joint_positions[joint.idx]
                     else:
@@ -331,6 +409,26 @@ class RBDAlgorithms(SpatialMathAbstract):
                         J[:, joint.idx] = self.vertcat(
                             self.skew(z_prev) @ p_prev, z_prev
                         )
+                    if joint_type_i == "prismatic": 
+                        if joint.idx is not None:
+                            q_ = joint_positions[joint.idx]
+                        else:
+                            q_ = 0.0
+                        T_joint = self.H_prismatic_joint(
+                            o_joint,
+                            rpy_joint,
+                            joint.axis,
+                            q_,
+                        )
+                        T_fk = T_fk @ T_joint
+                        p_prev = P_ee - T_fk[:3, 3]
+                        z_prev = T_fk[:3, :3] @ joint.axis
+                        # J[:, joint.idx] = self.vertcat(
+                        #     cs.jacobian(P_ee, joint_positions[joint.idx]), z_prev) # using casadi jacobian
+                        if joint.idx is not None:
+                            J[:, joint.idx] = self.vertcat(
+                                self.skew(z_prev) @ p_prev, z_prev
+                            )                    
         return J
 
     def CoM_position(self, base_transform: T, joint_positions: T, density: T=None, length_multiplier: T=None) -> T:
@@ -445,18 +543,18 @@ class RBDAlgorithms(SpatialMathAbstract):
             [Ic_temp, o, rpy,_, link_i]= self.getLinkAttributes( i, lenght_multiplier, density)
             Ic[i] = Ic_temp
             [o_joint, rpy_joint,joint_i] = self.getJointAttributes(i, lenght_multiplier, density)
-            
+            joint_i_type = self.get_joint_type(joint_i)
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
                 X_p[i] = self.spatial_transform(self.eye(3), self.zeros(3, 1))
                 Phi[i] = self.eye(6)
                 v_J = Phi[i] @ X_to_mixed @ base_velocity
-            elif joint_i.joint_type == "fixed":
+            elif joint_i_type == "fixed":
                 X_J = self.X_fixed_joint(o_joint, rpy_joint)
                 X_p[i] = X_J
                 Phi[i] = self.vertcat(0, 0, 0, 0, 0, 0)
                 v_J = self.zeros(6, 1)
-            elif joint_i.joint_type == "revolute" or joint_i.joint_type == "continuous":
+            elif joint_i_type == "revolute" or joint_i_type == "continuous":
                 if joint_i.idx is not None:
                     q_ = joint_positions[joint_i.idx]
                     joint_velocities_ = joint_velocities[joint_i.idx]
@@ -475,7 +573,25 @@ class RBDAlgorithms(SpatialMathAbstract):
                     0, 0, 0, joint_i.axis[0], joint_i.axis[1], joint_i.axis[2]
                 )
                 v_J = Phi[i] * joint_velocities_
+            elif(joint_i_type == "prismatic"): 
+                if joint_i.idx is not None:
+                    q_ = joint_positions[joint_i.idx]
+                    joint_velocities_ = joint_velocities[joint_i.idx]
+                else:
+                    q_ = 0.0
+                    joint_velocities_ = 0.0
 
+                X_J = self.X_prismatic_joint(
+                    o_joint,
+                    rpy_joint,
+                    joint_i.axis,
+                    q_,
+                )
+                X_p[i] = X_J
+                Phi[i] = self.vertcat(
+                    0, 0, 0, joint_i.axis[0], joint_i.axis[1], joint_i.axis[2]
+                )
+                v_J = Phi[i] * joint_velocities_
             if link_i.name == self.root_link:
                 v[i] = v_J
                 a[i] = X_p[i] @ a[0]

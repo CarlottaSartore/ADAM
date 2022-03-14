@@ -30,6 +30,15 @@ class SpatialMathAbstract(abc.ABC):
         q: npt.NDArray,
     ):
         pass
+    @abc.abstractmethod
+    def H_prismatic_joint(
+        self,
+        xyz: npt.NDArray,
+        rpy: npt.NDArray,
+        axis: npt.NDArray,
+        q: npt.NDArray,
+    ):
+        pass
 
     @abc.abstractmethod
     def H_from_Pos_RPY(self, xyz: npt.NDArray, rpy: npt.NDArray):
@@ -41,6 +50,16 @@ class SpatialMathAbstract(abc.ABC):
 
     @abc.abstractmethod
     def X_revolute_joint(
+        self,
+        xyz: npt.NDArray,
+        rpy: npt.NDArray,
+        axis: npt.NDArray,
+        q: npt.NDArray,
+    ):
+        pass
+    
+    @abc.abstractmethod
+    def X_prismatic_joint(
         self,
         xyz: npt.NDArray,
         rpy: npt.NDArray,
