@@ -68,8 +68,10 @@ class RBDAlgorithms(SpatialMathAbstract):
         else:
             return None
     
-    def get_joint_type(self, joint_i): 
-        joint_type_i = ""
+    def get_joint_type(self, joint_i, o_joint, axis): 
+        joint_type_i = "ciao"
+        o_joint_new = o_joint
+        joint_limits = 0.02
         if(not(self.joint_type is None)): 
             if(joint_i in self.joints_list): 
                 idx = self.joints_list.index(joint_i)
@@ -77,13 +79,15 @@ class RBDAlgorithms(SpatialMathAbstract):
                     joint_type_i = "revolute"
                 else: 
                     joint_type_i = "prismatic"
+                    if(abs(axis[2]) == 1.0): 
+                        o_joint_new[2] = o_joint[2] + joint_limits
             else: 
                 if(hasattr(joint_i, "joint_type")): 
-                    return joint_i.joint_type
+                    return joint_i.joint_type, o_joint_new
         else: 
             if(hasattr(joint_i, "joint_type")): 
-                return joint_i.joint_type
-        return joint_type_i 
+                return joint_i.joint_type, o_joint_new
+        return joint_type_i, o_joint_new
 
     def findLinkCharacteristic(self, name):
         if(self.link_characteristics is None): 
@@ -123,8 +127,8 @@ class RBDAlgorithms(SpatialMathAbstract):
         for i in range(self.tree.N):
             [Ic_temp, o, rpy,_, link_i]= self.getLinkAttributes( i, length_multiplier, density)
             Ic[i] = Ic_temp
-            [o_joint, rpy_joint,joint_i] = self.getJointAttributes(i, length_multiplier, density)
-            joint_type_i = self.get_joint_type(joint_i)
+            [o_joint_temp, rpy_joint,joint_i, axis] = self.getJointAttributes(i, length_multiplier, density)
+            joint_type_i, o_joint = self.get_joint_type(joint_i=joint_i, o_joint=o_joint_temp, axis=axis)
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
                 X_p[i] = self.spatial_transform(self.eye(3), self.zeros(3, 1))
@@ -250,8 +254,8 @@ class RBDAlgorithms(SpatialMathAbstract):
         for item in chain:
             if item in self.robot_desc.joint_map:
                 i = self.tree.joints.index(self.robot_desc.joint_map[item])
-                [o_joint, rpy_joint,joint] = self.getJointAttributes(i, length_multiplier, density)
-                joint_type_i = self.get_joint_type(joint)
+                [o_joint_temp, rpy_joint,joint,axis] = self.getJointAttributes(i, length_multiplier, density)
+                [joint_type_i, o_joint] = self.get_joint_type(joint, o_joint_temp, axis)
                 if joint_type_i == "fixed":
                     xyz = o_joint
                     rpy = rpy_joint
@@ -305,8 +309,8 @@ class RBDAlgorithms(SpatialMathAbstract):
         for item in chain:
             if item in self.robot_desc.joint_map:
                 i = self.tree.joints.index(self.robot_desc.joint_map[item])
-                [o_joint, rpy_joint,joint] = self.getJointAttributes(i, length_multiplier, density)
-                joint_type_i = self.get_joint_type(joint)
+                [o_joint_temp, rpy_joint,joint, axis] = self.getJointAttributes(i, length_multiplier, density)
+                [joint_type_i, o_joint] = self.get_joint_type(joint, o_joint_temp, axis)
                 if joint_type_i == "fixed":
                     xyz = o_joint
                     rpy = rpy_joint
@@ -382,8 +386,8 @@ class RBDAlgorithms(SpatialMathAbstract):
         for item in chain:
             if item in self.robot_desc.joint_map:
                 i = self.tree.joints.index(self.robot_desc.joint_map[item])
-                [o_joint, rpy_joint,joint] = self.getJointAttributes(i, length_multiplier, density)
-                joint_type_i = self.get_joint_type(joint)
+                [o_joint_temp, rpy_joint,joint, axis] = self.getJointAttributes(i, length_multiplier, density)
+                [joint_type_i, o_joint] = self.get_joint_type(joint, o_joint_temp, axis)
                 if joint_type_i == "fixed":
                     xyz = o_joint
                     rpy = rpy_joint
@@ -542,8 +546,8 @@ class RBDAlgorithms(SpatialMathAbstract):
             link_pi = self.tree.parents[i]
             [Ic_temp, o, rpy,_, link_i]= self.getLinkAttributes( i, lenght_multiplier, density)
             Ic[i] = Ic_temp
-            [o_joint, rpy_joint,joint_i] = self.getJointAttributes(i, lenght_multiplier, density)
-            joint_i_type = self.get_joint_type(joint_i)
+            [o_joint_temp, rpy_joint,joint_i, axis] = self.getJointAttributes(i, lenght_multiplier, density)
+            [joint_i_type, o_joint] = self.get_joint_type(joint_i, o_joint_temp, axis)
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
                 X_p[i] = self.spatial_transform(self.eye(3), self.zeros(3, 1))
@@ -629,16 +633,19 @@ class RBDAlgorithms(SpatialMathAbstract):
             joint_i_param = link_parametric.jointParametric(joint_i.name,link_i_parametric, joint_i, joint_char)
             o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
             rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
+            axis = joint_i.axis
         else:   
             if(hasattr(joint_i, "origin")):
                 origin_joint_temp = urdfpy.matrix_to_xyz_rpy(joint_i.origin)
                 o_joint = [origin_joint_temp[0], origin_joint_temp[1], origin_joint_temp[2]]
                 rpy_joint = [origin_joint_temp[3], origin_joint_temp[4], origin_joint_temp[5]]
+                axis = joint_i.axis
             else: 
                 # fake output 
                 o_joint = []
                 rpy_joint = []        
-        return o_joint, rpy_joint, joint_i
+                axis = [0.0,0.0,0.0]
+        return o_joint, rpy_joint, joint_i, axis
 
     def getLinkAttributes(self, index, lenght_multiplier, density): 
         if self.tree.links[index].name in self.link_name_list:
