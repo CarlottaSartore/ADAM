@@ -14,7 +14,7 @@ from adam.casadi.computations import KinDynComputations
 from adam.geometry import utils
 from adam.core import link_parametric
 
-model_path ="/home/carlotta/iit_ws/element_hardware-intelligence/Models/model.urdf"
+model_path ="/home/carlotta/iit_ws/element_hardware-intelligence/ModelsTemp/ModelModified0.urdf"
 
 joints_name_list = [
     "torso_pitch",
@@ -42,7 +42,7 @@ joints_name_list = [
     "r_ankle_roll",
 ]
 
-part_list ="LeftLeg"
+part_list ="RightLeg"
 
 def get_link_join_char(linkPartName):
     links_characteristics = []
@@ -65,18 +65,24 @@ def get_link_join_char(linkPartName):
                                  joint_name_list[1]:link_parametric.JointCharacteristics(0.0506)}
         return link_name_list, joint_name_list, links_characteristics, joint_characteristics
     if(linkPartName == 'RightLeg'): 
-        link_name_list = ['r_hip_3', 'r_lower_leg']
-        joint_name_list = ['r_hip_yaw', 'r_ankle_pitch']
-        links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(0.058),
-                                 link_name_list[1]:link_parametric.LinkCharacteristics(-0.03)}
-        joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(0.1451),
-                                 joint_name_list[1]:link_parametric.JointCharacteristics(-0.055989)}
+        link_name_list = ['r_upper_leg','r_lower_leg']
+        joint_name_list = ['r_knee','r_ankle_pitch']
+        links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(0.0375, None, flip_direction=False),link_name_list[1]:link_parametric.LinkCharacteristics(0.23,None, True)}
+        joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(0.0295),joint_name_list[1]:link_parametric.JointCharacteristics(-0.155989)}
         return link_name_list, joint_name_list, links_characteristics, joint_characteristics
     if(linkPartName == 'LeftLeg'): 
-        link_name_list = ['l_lower_leg']
-        joint_name_list = ['l_ankle_pitch']
-        links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(-0.03)}
-        joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(-0.055989)}
+        # link_name_list = ['l_lower_leg']
+        # joint_name_list = ['l_ankle_pitch']
+        # links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(0.23, None, True)}
+        # joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(-0.155989)}
+        link_name_list = ['l_upper_leg','l_lower_leg']
+        joint_name_list = ['l_knee','l_ankle_pitch']
+        links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(0.0375, None, flip_direction=False),link_name_list[1]:link_parametric.LinkCharacteristics(0.23,None, True)}
+        joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(0.0295),joint_name_list[1]:link_parametric.JointCharacteristics(-0.155989)}
+        # link_name_list = ['l_upper_leg','l_lower_leg']
+        # joint_name_list = ['l_knee', 'l_ankle_pitch']
+        # links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(-0.03),link_name_list[1]:link_parametric.LinkCharacteristics(0.0)}
+        # joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(-0.055989), joint_name_list[1]:link_parametric.JointCharacteristics(0.0)}
         return link_name_list, joint_name_list, links_characteristics, joint_characteristics
     if(linkPartName == 'Torso'): 
         link_name_list = ['root_link', 'torso_1', 'torso_2', 'chest']

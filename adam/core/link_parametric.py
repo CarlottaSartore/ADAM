@@ -100,7 +100,7 @@ class linkParametric():
         visual = self.get_visual()
         """Modifies the position of the origin by a given amount"""
         xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
-
+        length = self.get_principal_length()
         if self.geometry_type == Geometry.BOX:
             index_to_change = 2 
             if (self.link_characteristic.dimension == Side.DEPTH):
@@ -116,14 +116,20 @@ class linkParametric():
                 origin[2] = temp 
             origin[2] += self.link_characteristic.offset
         elif self.geometry_type == Geometry.CYLINDER:
-            origin[2] = -self.visual_data_new[0] / 2 + self.link_characteristic.offset
+            origin[2] = -length+ self.link_characteristic.offset
+            if(self.link_characteristic.flip_direction): 
+                origin[2] = -origin[2]
             origin[0] = xyz_rpy[0]
             origin[1] = xyz_rpy[1]
             origin[3] = xyz_rpy[3]
             origin[4] = xyz_rpy[4]
             origin[5] = xyz_rpy[5]
+
+            # print(self.link.name)
+            # print("orignial", xyz_rpy)
+            # print("new", origin)
         elif self.geometry_type == Geometry.SPHERE:
-            "in case of a sphere the origin of the frame does not change"
+            "in case of a sphere the origin of the framjoint_name_list[0]:link_parametric.JointCharacteristics(0.0295),e does not change"
             origin = xyz_rpy
         return origin
 
@@ -149,8 +155,17 @@ class linkParametric():
             I.izz = I.ixx
         return I
 
-    def get_principal_length(self):      
+    def get_principal_length(self):   
+        visual = self.get_visual()
+    #    """Modifies the position of the origin by a given amount"""
+        xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
         if self.geometry_type == Geometry.CYLINDER:
+            if(xyz_rpy[3] < 0.0 or xyz_rpy[4] > 0.0):
+                return self.visual_data_new[1] # returning the radius, since the orientation of the shape is such that the radius is the principal lenght 
+            else: 
+                return self.visual_data_new[0]/2 # returning the lenght, since the orientation of the shape is such that the radius is the principal lenght 
+
+
             return self.visual_data_new[0]
         elif self.geometry_type == Geometry.BOX:
             index = 2
@@ -191,5 +206,7 @@ class jointParametric:
             if self.jointCharacteristic.flip_direction:
                 xyz_rpy[2] *= -1
             xyz_rpy[2] +=  self.jointCharacteristic.offset
-
+        # print(self.jointName)
+        # print("new",xyz_rpy)
+        # print("original",xyz_rpy_temp)
         return xyz_rpy
