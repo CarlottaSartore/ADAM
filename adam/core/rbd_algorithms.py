@@ -465,7 +465,7 @@ class RBDAlgorithms(SpatialMathAbstract):
                     j = self.link_name_list.index(item)
                     link_original = self.robot_desc.link_map[item]
                     link_char = self.findLinkCharacteristic(item)
-                    link_parametric_i = link_parametric.linkParametric(item, length_multiplier[j],density[j],self.robot_desc,link_original, link_char) 
+                    link_parametric_i = link_parametric.linkParametric(item, length_multiplier[j,:],density[j],self.robot_desc,link_original, link_char) 
                     mass += link_parametric_i.mass
                 else:
                     link = self.robot_desc.link_map[item]
@@ -486,7 +486,7 @@ class RBDAlgorithms(SpatialMathAbstract):
                 j = self.link_name_list.index(item)
                 link_original = self.robot_desc.link_map[item]
                 link_char = self.findLinkCharacteristic(item)
-                link_parametric_i = link_parametric.linkParametric(item, length_multiplier[j],density[j],self.robot_desc,link_original, link_char) 
+                link_parametric_i = link_parametric.linkParametric(item, length_multiplier[j,:],density[j],self.robot_desc,link_original, link_char) 
                 mass += link_parametric_i.mass
             else:
                 link = self.robot_desc.link_map[item]
@@ -629,7 +629,7 @@ class RBDAlgorithms(SpatialMathAbstract):
             j = self.link_name_list.index(self.tree.parents[index].name)
             link_char = self.findLinkCharacteristic(self.tree.parents[index].name)
             joint_char = self.findJointCharacteristic(self.tree.joints[index].name)
-            link_i_parametric = link_parametric.linkParametric(self.tree.parents[index].name, lenght_multiplier[j],density[j],self.robot_desc,link_original_parent, link_char)
+            link_i_parametric = link_parametric.linkParametric(self.tree.parents[index].name, lenght_multiplier[j,:],density[j],self.robot_desc,link_original_parent, link_char)
             joint_i_param = link_parametric.jointParametric(joint_i.name,link_i_parametric, joint_i, joint_char)
             o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
             rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
@@ -652,7 +652,7 @@ class RBDAlgorithms(SpatialMathAbstract):
             link_original = self.get_element_by_name(self.tree.links[index].name, self.robot_desc)
             j = self.link_name_list.index(self.tree.links[index].name)
             link_char = self.findLinkCharacteristic(self.tree.links[index].name)
-            link_i = link_parametric.linkParametric(self.tree.links[index].name, lenght_multiplier[j], density[j], self.robot_desc, link_original, link_char)
+            link_i = link_parametric.linkParametric(self.tree.links[index].name, lenght_multiplier[j,:], density[j], self.robot_desc, link_original, link_char)
             I = link_i.I
             mass = link_i.mass 
             origin = link_i.origin

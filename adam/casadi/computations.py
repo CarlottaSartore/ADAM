@@ -62,7 +62,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             T_b = cs.SX.sym("T_b", 4, 4)
             s = cs.SX.sym("s", self.NDoF)
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier",len(self.link_name_list), 3 )
             [M,_] = super().crba(T_b, s,density, lenght_multiplier)
             return cs.Function("M", [T_b, s, density, lenght_multiplier], [M], self.f_opts)
 
@@ -81,7 +81,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             T_b = cs.SX.sym("T_b", 4, 4)
             s = cs.SX.sym("s", self.NDoF)
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list), 3)
             [_,Jcm] = super().crba(T_b, s,density, lenght_multiplier)
             return cs.Function("Jcm", [T_b, s, density, lenght_multiplier], [Jcm], self.f_opts)            
 
@@ -103,7 +103,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             s = cs.SX.sym("s", self.NDoF)
             T_b = cs.SX.sym("T_b", 4, 4)
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list), 3)
             T_fk = super().forward_kinematics(frame, T_b, s, density, lenght_multiplier)
             return cs.Function("T_fk", [T_b,s,density, lenght_multiplier], [T_fk], self.f_opts)
 
@@ -125,7 +125,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             s = cs.SX.sym("s", self.NDoF)
             T_b = cs.SX.sym("T_b", 4, 4)
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list), 3)
             J_tot = super().jacobian(frame, T_b, s, density, lenght_multiplier)
             return cs.Function("J_tot", [T_b,s,density, lenght_multiplier], [J_tot], self.f_opts)
 
@@ -134,7 +134,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             return super().get_total_mass()
         else: 
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier",len(self.link_name_list), 3)
             m = super().get_total_mass(density, lenght_multiplier)
             return cs.Function("m", [density, lenght_multiplier], [m], self.f_opts)
 
@@ -154,7 +154,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
         else: 
             s = cs.SX.sym("s", self.NDoF)
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list), 3)
             J = super().relative_jacobian(frame, s, density, lenght_multiplier)
             return cs.Function("J", [s, density, lenght_multiplier], [J], self.f_opts)
 
@@ -173,7 +173,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             s = cs.SX.sym("s", self.NDoF)
             T_b = cs.SX.sym("T_b", 4, 4)
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list), 3)
             com_pos = super().CoM_position(T_b, s, density, lenght_multiplier)
             return cs.Function("CoM_pos", [T_b, s, density, lenght_multiplier], [com_pos], self.f_opts)
 
@@ -197,7 +197,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             v_b = cs.SX.sym("v_b", 6)
             s_dot = cs.SX.sym("s_dot", self.NDoF)
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list), 3)
 
             h = super().rnea(T_b, s, v_b, s_dot, self.g, density, lenght_multiplier)
             return cs.Function("h", [T_b, s, v_b, s_dot, density, lenght_multiplier], [h], self.f_opts)
@@ -223,7 +223,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             v_b = cs.SX.sym("v_b", 6)
             q_dot = cs.SX.sym("q_dot", self.NDoF)
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier",len(self.link_name_list), 3)
             # set in the bias force computation the gravity term to zero
             C = super().rnea(T_b, q, v_b, q_dot, np.zeros(6), density, lenght_multiplier)
             return cs.Function("C", [T_b, q, v_b, q_dot, density, lenght_multiplier], [C], self.f_opts)
@@ -246,14 +246,14 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             T_b = cs.SX.sym("T_b", 4, 4)
             q = cs.SX.sym("q", self.NDoF)
             density = cs.SX.sym("density", len(self.link_name_list))
-            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list))
+            lenght_multiplier = cs.SX.sym("lenght_multiplier", len(self.link_name_list), 3)
             # set in the bias force computation the velocity to zero
             G = super().rnea(T_b, q, np.zeros(6), np.zeros(self.NDoF),self.g, density, lenght_multiplier)
             return cs.Function("G", [T_b, q, density, lenght_multiplier], [G], self.f_opts)
     
     def get_link_mass(self, link_name):
         if link_name in self.link_name_list:
-            length_multiplier = cs.SX.sym("length_multiplier",1)
+            length_multiplier = cs.SX.sym("length_multiplier",3)
             density = cs.SX.sym("density",1)
             j = self.link_name_list.index(link_name)
             link_original = self.robot_desc.link_map[link_name]
@@ -268,7 +268,7 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
             
     def get_link_volume(self,link_name): 
         if link_name in self.link_name_list:
-            length_multiplier = cs.SX.sym("length_multiplier",1)
+            length_multiplier = cs.SX.sym("length_multiplier",3)
             density = cs.SX.sym("density",1)
             j = self.link_name_list.index(link_name) 
             link_original = self.robot_desc.link_map[link_name]

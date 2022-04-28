@@ -73,23 +73,18 @@ class linkParametric():
         """Modifies a link's volume by a given multiplier, in a manner that is logical with the link's geometry"""
         if self.geometry_type == Geometry.BOX:
             visual_data_new =[0.0, 0.0, 0.0]
-            for i in range(2):
-                visual_data_new[i] = self.visual_data.size[i]
-            if self.link_characteristic.dimension == Side.WIDTH:
-                visual_data_new[0] = self.visual_data.size[0] * self.length_multiplier
-            elif self.link_characteristic.dimension == Side.HEIGHT:
-                visual_data_new[1] = self.visual_data.size[1] * self.length_multiplier
-            elif self.link_characteristic.dimension == Side.DEPTH:
-                visual_data_new[2] = self.visual_data.size[2] * self.length_multiplier
+            visual_data_new[0] = self.visual_data.size[0] * self.length_multiplier[0]
+            visual_data_new[1] = self.visual_data.size[1] * self.length_multiplier[1]
+            visual_data_new[2] = self.visual_data.size[2] * self.length_multiplier[2]
             volume = visual_data_new[0] * visual_data_new[1] * visual_data_new[2]
         elif self.geometry_type == Geometry.CYLINDER:
             visual_data_new = [0.0, 0.0]
-            visual_data_new[0] = self.visual_data.length * self.length_multiplier
-            visual_data_new[1] = self.visual_data.radius
+            visual_data_new[0] = self.visual_data.length * self.length_multiplier[0]
+            visual_data_new[1] = self.visual_data.radius * self.length_multiplier[1]
             volume = math.pi * visual_data_new[1] ** 2 * visual_data_new[0]
         elif self.geometry_type == Geometry.SPHERE:
             visual_data_new = 0.0
-            visual_data_new = self.visual_data.radius * self.length_multiplier
+            visual_data_new = self.visual_data.radius * self.length_multiplier[0]
             volume = 4 * math.pi * visual_data_new ** 3 / 3
         return volume, visual_data_new
 
@@ -154,7 +149,7 @@ class linkParametric():
             I.izz = I.ixx
         return I
 
-    def get_principal_length(self):
+    def get_principal_length(self):      
         if self.geometry_type == Geometry.CYLINDER:
             return self.visual_data_new[0]
         elif self.geometry_type == Geometry.BOX:
@@ -166,7 +161,9 @@ class linkParametric():
             elif(self.link_characteristic.dimension == Side.HEIGHT):
                 index = 1
             return self.visual_data_new[index]
+        
         else:
+        
             return 0
 
 class jointParametric:
