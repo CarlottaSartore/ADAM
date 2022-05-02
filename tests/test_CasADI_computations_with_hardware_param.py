@@ -3,6 +3,7 @@
 # GNU Lesser General Public License v2.1 or any later version.
 
 import logging
+from os import link
 
 import casadi as cs
 import idyntree.swig as idyntree
@@ -50,58 +51,27 @@ def get_link_join_char(linkPartName):
     link_name_list = []
     if(linkPartName == 'RightArm'): 
         link_name_list = ['r_upper_arm', 'r_forearm']
-        joint_name_list = ['r_elbow', 'r_wrist_pitch']
-        links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(0.022),
-                                 link_name_list[1]:link_parametric.LinkCharacteristics(0.03904)}
-        joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(0.0344),
-                                 joint_name_list[1]:link_parametric.JointCharacteristics(0.0506)}
-        return link_name_list, joint_name_list, links_characteristics, joint_characteristics
+        joint_name_list = link_name_list
+        return link_name_list, joint_name_list
     if(linkPartName == 'LeftArm'): 
         link_name_list = ['l_upper_arm', 'l_forearm']
-        joint_name_list = ['l_elbow', 'l_wrist_pitch']
-        links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(0.022),
-                                 link_name_list[1]:link_parametric.LinkCharacteristics(0.03904)}
-        joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(0.0344),
-                                 joint_name_list[1]:link_parametric.JointCharacteristics(0.0506)}
-        return link_name_list, joint_name_list, links_characteristics, joint_characteristics
+        joint_name_list = link_name_list
+        return link_name_list, joint_name_list
+    
     if(linkPartName == 'RightLeg'): 
-        link_name_list = ['r_upper_leg','r_lower_leg']
-        joint_name_list = ['r_knee','r_ankle_pitch']
-        links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(0.0375, None, flip_direction=False),link_name_list[1]:link_parametric.LinkCharacteristics(0.23,None, True)}
-        joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(0.0295),joint_name_list[1]:link_parametric.JointCharacteristics(-0.155989)}
-        return link_name_list, joint_name_list, links_characteristics, joint_characteristics
+        link_name_list = ['r_upper_leg','r_lower_leg', 'r_hip_1', 'r_hip_2', 'r_ankle_1', 'r_ankle_2']
+        joint_name_list = link_name_list
+        links_characteristics = {}
+        joint_characteristics = {}
+        return link_name_list, joint_name_list
     if(linkPartName == 'LeftLeg'): 
-        # link_name_list = ['l_lower_leg']
-        # joint_name_list = ['l_ankle_pitch']
-        # links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(0.23, None, True)}
-        # joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(-0.155989)}
-        link_name_list = ['l_upper_leg','l_lower_leg']
-        joint_name_list = ['l_knee','l_ankle_pitch']
-        links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(0.0375, None, flip_direction=False),link_name_list[1]:link_parametric.LinkCharacteristics(0.23,None, True)}
-        joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(0.0295),joint_name_list[1]:link_parametric.JointCharacteristics(-0.155989)}
-        # link_name_list = ['l_upper_leg','l_lower_leg']
-        # joint_name_list = ['l_knee', 'l_ankle_pitch']
-        # links_characteristics = {link_name_list[0]:link_parametric.LinkCharacteristics(-0.03),link_name_list[1]:link_parametric.LinkCharacteristics(0.0)}
-        # joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(-0.055989), joint_name_list[1]:link_parametric.JointCharacteristics(0.0)}
-        return link_name_list, joint_name_list, links_characteristics, joint_characteristics
+        link_name_list = ['l_ankle_2']
+        joint_name_list = link_name_list
+        return link_name_list, joint_name_list
     if(linkPartName == 'Torso'): 
         link_name_list = ['root_link', 'torso_1', 'torso_2', 'chest']
-        joint_name_list = ['torso_pitch', 'torso_yaw', 'torso_roll','r_hip_pitch', 'l_hip_pitch', 'r_shoulder_pitch', 'l_shoulder_pitch','neck_fixed_joint']
-        commonLinkCharacteristic = link_parametric.LinkCharacteristics(0,link_parametric.Side.WIDTH,flip_direction=True, calculate_origin_from_dimension = False)
-        links_characteristics = {link_name_list[0]:commonLinkCharacteristic,
-                                 link_name_list[1]:commonLinkCharacteristic,
-                                 link_name_list[2]:commonLinkCharacteristic,
-                                 link_name_list[3]:commonLinkCharacteristic} 
-        joint_characteristics = {joint_name_list[0]:link_parametric.JointCharacteristics(-0.078, flip_direction=False), 
-                                joint_name_list[1]:link_parametric.JointCharacteristics(-0.07113, flip_direction=False),
-                                joint_name_list[2]:link_parametric.JointCharacteristics(0.0, take_half_length=True, flip_direction=True,modify_origin=False), 
-                                joint_name_list[3]:link_parametric.JointCharacteristics(0.0494, take_half_length=True), 
-                                joint_name_list[4]:link_parametric.JointCharacteristics(0.0494, take_half_length=True), 
-                                joint_name_list[5]:link_parametric.JointCharacteristics(0.0554, take_half_length=True, flip_direction=False), 
-                                joint_name_list[6]:link_parametric.JointCharacteristics(0.0554, take_half_length=True, flip_direction=False), 
-                                joint_name_list[7]:link_parametric.JointCharacteristics(0.0607, take_half_length=True, flip_direction=False)}
-        return link_name_list, joint_name_list, links_characteristics, joint_characteristics
-
+        joint_name_list = link_name_list
+        return link_name_list, joint_name_list
 
 def ComputeOriginalDensity(kinDyn, link_name): 
     link_original = kinDyn.get_element_by_name(link_name, kinDyn.robot_desc)
@@ -143,16 +113,16 @@ logging.debug("Showing the robot tree.")
 root_link = "root_link"
 comp = KinDynComputations(model_path, joints_name_list, root_link)
 
-[link_name_list, _, links_characteristics, joint_characteristics] = get_link_join_char(part_list)
+[link_name_list, _] = get_link_join_char(part_list)
 
 
-comp_w_hardware = KinDynComputations(model_path, joints_name_list, root_link, np.zeros(len(joints_name_list)),link_name_list, links_characteristics, joint_characteristics)
+comp_w_hardware = KinDynComputations(model_path, joints_name_list, root_link, np.zeros(len(joints_name_list)),link_name_list)
 original_density = []
 for item in link_name_list: 
     original_density += [ComputeOriginalDensity(comp_w_hardware,item)]
 
 original_length = np.ones([len(link_name_list),3])
-
+print("original density",original_density)
 joint_type = np.zeros(len(joints_name_list))
 
 n_dofs = len(joints_name_list)
@@ -174,7 +144,9 @@ M = comp.mass_matrix_fun()
 M_with_hardware = comp_w_hardware.mass_matrix_fun()
 mass_test = SX2DM(M(H_b, s_))
 mass_test_hardware = SX2DM(M_with_hardware(H_b,s_, original_density, original_length))
-print(cs.sumsqr(mass_test - mass_test_hardware))
+print("original density", original_density)
+print("orginal length", original_length)
+print("M=",cs.sumsqr(mass_test - mass_test_hardware))
     # assert mass_test - mass_test_hardware == pytest.approx(0.0, abs=1e-5)
 
 
@@ -183,7 +155,7 @@ Jcm = comp.centroidal_momentum_matrix_fun()
 Jcm_with_hardware = comp_w_hardware.centroidal_momentum_matrix_fun()
 Jcm_test = SX2DM(Jcm(H_b, s_))
 Jcm_test_hardware = SX2DM(Jcm_with_hardware(H_b,s_, original_density, original_length))
-print(cs.sumsqr(Jcm_test - Jcm_test_hardware))
+print("Jcmm=",cs.sumsqr(Jcm_test - Jcm_test_hardware))
 # assert Jcm_test - Jcm_test_hardware == pytest.approx(0.0, abs=1e-5)
 
 
@@ -192,7 +164,7 @@ com_f = comp.CoM_position_fun()
 com_with_hardware_f = comp_w_hardware.CoM_position_fun()
 CoM_cs = SX2DM(com_f(H_b, s_))
 CoM_hardware  = SX2DM(com_with_hardware_f(H_b,s_, original_density, original_length)) 
-print(cs.sumsqr(CoM_cs - CoM_hardware))
+print("CoM=",cs.sumsqr(CoM_cs - CoM_hardware))
     # assert CoM_cs - CoM_hardware == pytest.approx(0.0, abs=1e-5)
 
 
@@ -200,7 +172,7 @@ print(cs.sumsqr(CoM_cs - CoM_hardware))
 mass = comp.get_total_mass(); 
 mass_hardware_fun = comp_w_hardware.get_total_mass()
 mass_hardware = SX2DM(mass_hardware_fun(original_density, original_length))
-print(cs.sumsqr(mass - mass_hardware))
+print("mass=",cs.sumsqr(mass - mass_hardware))
     # assert mass - mass_hardware == pytest.approx(0.0, abs=1e-5)
 
 # # def test_jacobian():
@@ -208,7 +180,7 @@ J_tot = comp.jacobian_fun("l_sole")
 J_tot_with_hardware = comp_w_hardware.jacobian_fun("l_sole")
 J_test = SX2DM(J_tot(H_b, s_))
 J_test_hardware = SX2DM(J_tot_with_hardware(H_b, s_, original_density, original_length))
-print(cs.sumsqr(J_test- J_test_hardware))
+print("J=",cs.sumsqr(J_test- J_test_hardware))
 # assert J_test - J_test_hardware == pytest.approx(0.0, abs=1e-5)
 
 
@@ -217,7 +189,7 @@ J_tot = comp.jacobian_fun("head")
 J_test = SX2DM(J_tot(H_b, s_))
 J_tot_with_hardware = comp_w_hardware.jacobian_fun("head")
 J_tot_with_hardware_test = SX2DM(J_tot_with_hardware(H_b, s_, original_density, original_length))
-print(cs.sumsqr(J_test - J_tot_with_hardware_test))    
+print("J=",cs.sumsqr(J_test - J_tot_with_hardware_test))    
     # assert J_test - J_tot_with_hardware_test == pytest.approx(0.0, abs=1e-5)
 
 
@@ -226,7 +198,7 @@ T = comp.forward_kinematics_fun("l_sole")
 H_test = SX2DM(T(H_b, s_))
 T_with_hardware = comp_w_hardware.forward_kinematics_fun("l_sole")
 H_with_hardware_test = SX2DM(T_with_hardware(H_b, s_, original_density, original_length))
-print(cs.sumsqr(H_test - H_with_hardware_test))    
+print("fk=",cs.sumsqr(H_test - H_with_hardware_test))    
     # assert H_with_hardware_test[:3,:3] - H_test[:3, :3] == pytest.approx(0.0, abs=1e-5)
     # assert H_with_hardware_test[:3,3] - H_test[:3, 3] == pytest.approx(0.0, abs=1e-5)
 
@@ -236,7 +208,7 @@ T = comp.forward_kinematics_fun("head")
 H_test = SX2DM(T(H_b, s_))
 T_with_hardware = comp_w_hardware.forward_kinematics_fun("head")
 H_with_hardware_test = SX2DM(T_with_hardware(H_b,s_,original_density, original_length))
-print(cs.sumsqr(H_test - H_with_hardware_test))
+print("fk=",cs.sumsqr(H_test - H_with_hardware_test))
     # assert H_with_hardware_test[:3,:3] - H_test[:3, :3] == pytest.approx(0.0, abs=1e-5)
     # assert H_with_hardware_test[:3,3] - H_test[:3, 3] == pytest.approx(0.0, abs=1e-5)
 
@@ -247,7 +219,7 @@ h_test = SX2DM(h(H_b, s_, vb_, s_dot_))
 
 h_with_hardware = comp_w_hardware.bias_force_fun()
 h_with_hardware_test = SX2DM(h_with_hardware(H_b, s_, vb_, s_dot_, original_density, original_length))
-print(cs.sumsqr(h_with_hardware_test-h_test))   
+print("h=",cs.sumsqr(h_with_hardware_test-h_test))   
 # assert h_with_hardware_test - h_test == pytest.approx(0.0, abs=1e-4)
 
 
@@ -256,7 +228,7 @@ C = comp.coriolis_term_fun()
 C_test = SX2DM(C(H_b, s_, vb_, s_dot_))
 C_with_hardware = comp_w_hardware.coriolis_term_fun()
 C_with_hardware_test = SX2DM(C_with_hardware(H_b, s_, vb_, s_dot_, original_density, original_length))
-print(cs.sumsqr(C_test - C_with_hardware_test)) 
+print("C=",cs.sumsqr(C_test - C_with_hardware_test)) 
     # assert C_with_hardware_test - C_test == pytest.approx(0.0, abs=1e-4)
 
 
@@ -265,5 +237,5 @@ G = comp.gravity_term_fun()
 G_test = SX2DM(G(H_b, s_))
 G_with_hardware = comp_w_hardware.gravity_term_fun()
 G_with_hardware_test = G_with_hardware(H_b,s_, original_density, original_length)
-print(cs.sumsqr(G_test- G_with_hardware_test))
+print("G=",cs.sumsqr(G_test- G_with_hardware_test))
     # assert G_with_hardware_test - G_test == pytest.approx(0.0, abs=1e-4)

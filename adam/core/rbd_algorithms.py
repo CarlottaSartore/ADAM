@@ -28,9 +28,7 @@ class RBDAlgorithms(SpatialMathAbstract):
         root_link: str,
         gravity: np.array,
         joint_type: np.array= None,
-        link_name_list: list = [], 
-        link_characteristics:dict = None,
-        joint_characteristics:dict = None,
+        link_name_list: list = []
     ) -> None:
         """
         Args:
@@ -55,8 +53,6 @@ class RBDAlgorithms(SpatialMathAbstract):
             self.tree,
         ) = urdf_tree.load_model()
         self.link_name_list = link_name_list
-        self.link_characteristics = link_characteristics
-        self.joint_characteristics = joint_characteristics
         self.joint_type = joint_type
 
     @staticmethod
@@ -89,24 +85,8 @@ class RBDAlgorithms(SpatialMathAbstract):
                 return joint_i.joint_type, o_joint_new
         return joint_type_i, o_joint_new
 
-    def findLinkCharacteristic(self, name):
-        if(self.link_characteristics is None): 
-            return link_parametric.LinkCharacteristics()
-        for key, val in self.link_characteristics.items():
-            if(key == name):
-               return val
-        return link_parametric.LinkCharacteristics()
-
     def set_jont_type(self, joint_type): 
         self.joint_type = joint_type
-
-    def findJointCharacteristic(self, name):
-        if(self.joint_characteristics is None): 
-            return link_parametric.JointCharacteristics()
-        for key, val in self.joint_characteristics.items():
-            if(key == name):
-               return val
-        return link_parametric.JointCharacteristics()
     
     def crba(self, base_transform: T, joint_positions: T,density: T = None, length_multiplier: T = None) -> T:
         """This function computes the Composite Rigid body algorithm (Roy Featherstone) that computes the Mass Matrix.
@@ -129,6 +109,7 @@ class RBDAlgorithms(SpatialMathAbstract):
             Ic[i] = Ic_temp
             [o_joint_temp, rpy_joint,joint_i, axis] = self.getJointAttributes(i, length_multiplier, density)
             joint_type_i, o_joint = self.get_joint_type(joint_i=joint_i, o_joint=o_joint_temp, axis=axis)
+            
             if link_i.name == self.root_link:
                 # The first "real" link. The joint is universal.
                 X_p[i] = self.spatial_transform(self.eye(3), self.zeros(3, 1))
@@ -464,8 +445,7 @@ class RBDAlgorithms(SpatialMathAbstract):
                 if item in self.link_name_list: 
                     j = self.link_name_list.index(item)
                     link_original = self.robot_desc.link_map[item]
-                    link_char = self.findLinkCharacteristic(item)
-                    link_parametric_i = link_parametric.linkParametric(item, length_multiplier[j,:],density[j],self.robot_desc,link_original, link_char) 
+                    link_parametric_i = link_parametric.linkParametric(item, length_multiplier[j,:],density[j],self.robot_desc,link_original) 
                     mass += link_parametric_i.mass
                 else:
                     link = self.robot_desc.link_map[item]
@@ -485,8 +465,7 @@ class RBDAlgorithms(SpatialMathAbstract):
             if item in self.link_name_list: 
                 j = self.link_name_list.index(item)
                 link_original = self.robot_desc.link_map[item]
-                link_char = self.findLinkCharacteristic(item)
-                link_parametric_i = link_parametric.linkParametric(item, length_multiplier[j,:],density[j],self.robot_desc,link_original, link_char) 
+                link_parametric_i = link_parametric.linkParametric(item, length_multiplier[j,:],density[j],self.robot_desc,link_original) 
                 mass += link_parametric_i.mass
             else:
                 link = self.robot_desc.link_map[item]
@@ -627,10 +606,8 @@ class RBDAlgorithms(SpatialMathAbstract):
         if self.tree.parents[index].name in self.link_name_list: 
             link_original_parent = self.get_element_by_name(self.tree.parents[index].name, self.robot_desc)  
             j = self.link_name_list.index(self.tree.parents[index].name)
-            link_char = self.findLinkCharacteristic(self.tree.parents[index].name)
-            joint_char = self.findJointCharacteristic(self.tree.joints[index].name)
-            link_i_parametric = link_parametric.linkParametric(self.tree.parents[index].name, lenght_multiplier[j,:],density[j],self.robot_desc,link_original_parent, link_char)
-            joint_i_param = link_parametric.jointParametric(joint_i.name,link_i_parametric, joint_i, joint_char)
+            link_i_parametric = link_parametric.linkParametric(self.tree.parents[index].name, lenght_multiplier[j,:],density[j],self.robot_desc,link_original_parent)
+            joint_i_param = link_parametric.jointParametric(joint_i.name,link_i_parametric, joint_i)
             o_joint = [joint_i_param.origin[0],joint_i_param.origin[1],joint_i_param.origin[2]]
             rpy_joint = [joint_i_param.origin[3],joint_i_param.origin[4], joint_i_param.origin[5]]
             axis = joint_i.axis
@@ -645,14 +622,18 @@ class RBDAlgorithms(SpatialMathAbstract):
                 o_joint = []
                 rpy_joint = []        
                 axis = [0.0,0.0,0.0]
+        # if(self.tree.parents[index].name in ["r_upper_leg", "r_lower_leg"]):
+        #     print(joint_i.name)
+        #     print("o joint", o_joint)
+        #     print("rpy_joint", rpy_joint)
+        #     print("axis", axis )
         return o_joint, rpy_joint, joint_i, axis
 
     def getLinkAttributes(self, index, lenght_multiplier, density): 
         if self.tree.links[index].name in self.link_name_list:
             link_original = self.get_element_by_name(self.tree.links[index].name, self.robot_desc)
             j = self.link_name_list.index(self.tree.links[index].name)
-            link_char = self.findLinkCharacteristic(self.tree.links[index].name)
-            link_i = link_parametric.linkParametric(self.tree.links[index].name, lenght_multiplier[j,:], density[j], self.robot_desc, link_original, link_char)
+            link_i = link_parametric.linkParametric(self.tree.links[index].name, lenght_multiplier[j,:], density[j], self.robot_desc, link_original)
             I = link_i.I
             mass = link_i.mass 
             origin = link_i.origin
@@ -671,6 +652,20 @@ class RBDAlgorithms(SpatialMathAbstract):
             o = [origin[0],origin[1], origin[2]]
             rpy = [origin[3], origin[4], origin[5]]
             Ic = self.spatial_inertia(I, mass, o, rpy)
+        # if(link_i.name in ["r_upper_leg", "r_lower_leg"]):
+        #     print(link_i.name)
+        #     print("origin", o)
+        #     print("inertia")
+        #     if(hasattr(I, "ixx")):
+        #         print(I.ixx)
+        #         print(I.iyy)
+        #         print(I.izz)
+        #     else:
+        #         print(I[0,0])
+        #         print(I[1,1])
+        #         print(I[2,2])
+        #     print("rpy",rpy)
+        #     print("mass", mass)             
         return Ic, o, rpy, mass, link_i
 
     def aba(self):

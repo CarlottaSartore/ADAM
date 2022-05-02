@@ -1,3 +1,4 @@
+from os import link
 from urdfpy import matrix_to_xyz_rpy
 from enum import Enum
 import math
@@ -10,21 +11,6 @@ class I_parametric():
         self.iyy = 0.0
         self.iyz = 0.0
         self.izz = 0.0
-
-class LinkCharacteristics: 
-    def __init__(self, offset =0.0, dimension = None, flip_direction = False, calculate_origin_from_dimension = True) -> None:
-        
-        self.offset = offset
-        self.flip_direction = flip_direction
-        self.dimension = dimension
-        self.calculate_origin_from_dimension = calculate_origin_from_dimension
-
-class JointCharacteristics: 
-    def __init__(self, offset = 0.0, take_half_length = False, flip_direction = False, modify_origin = True) -> None:
-        self.offset = offset
-        self.take_half_length = take_half_length
-        self.flip_direction = flip_direction
-        self.modify_origin = modify_origin
 
 class Geometry(Enum):
     """The different types of geometries that constitute the URDF"""
@@ -39,26 +25,27 @@ class Side(Enum):
     DEPTH = 3
 
 class linkParametric():
-    def __init__(self, link_name: str, length_multiplier, density, robot, link, link_characteristics = LinkCharacteristics()) -> None:
+    def __init__(self, link_name: str, length_multiplier, density, robot, link) -> None:
         self.name = link_name
         self.density = density
         self.length_multiplier = length_multiplier
         self.link = link
-        self.link_characteristic = link_characteristics
         self.geometry_type, self.visual_data = self.get_geometry(self.get_visual())
+        parent_joint_list = [corresponding_joint for corresponding_joint in robot.joints if corresponding_joint.child == link.name]
+        self.parent_joint = (parent_joint_list[0] if parent_joint_list else None)
+        child_joint_list = [corresponding_joint for corresponding_joint in robot.joints if corresponding_joint.parent == link.name]
+        self.child_joint = (child_joint_list[0] if child_joint_list else None)
+        link_offset = self.compute_offset()
+        self.offset = link_offset
+        
         (self.volume, self.visual_data_new) = self.compute_volume()
         self.mass = self.compute_mass()
         self.I = self.compute_inertia_parametric()
         self.origin = self.modify_origin()
         self.inertial = self.I
-        parent_joint_list = [corresponding_joint for corresponding_joint in robot.joints if corresponding_joint.child == link.name]
-        self.parent_joint = (parent_joint_list[0] if parent_joint_list else None)
-        child_joint_list = [corresponding_joint for corresponding_joint in robot.joints if corresponding_joint.parent == link.name]
-        self.child_joint = (child_joint_list[0] if child_joint_list else None)
-        link_offset, joint_offset = self.compute_offsets()
-        link_characteristics.offset = link_offset
+       
 
-    def compute_offsets(self): 
+    def compute_offset(self): 
         # Taking the principal direction i.e. the length 
         visual = self.get_visual()
         xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
@@ -68,12 +55,25 @@ class linkParametric():
                 v_l = 2*self.visual_data.radius # returning the diameter, since the orientation of the shape is such that the radius is the principal lenght 
             else: 
                 v_l=self.visual_data.length # returning the lenght, since the orientation of the shape is such that the radius is the principal lenght 
-        j_0 = matrix_to_xyz_rpy(self.child_joint.origin)[2]
         v_o = xyz_rpy[2]
-        link_offset = (v_o - v_l/2)* math.copysign(1,v_o)
+        link_offset = (v_o - v_l/2)
+        return link_offset
+
+    def compute_joint_offset(self,joint_i): 
+         # Taking the principal direction i.e. the length 
+        visual = self.get_visual()
+        xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
+        v_l= 0.0
+        if self.geometry_type == Geometry.CYLINDER:
+            if(xyz_rpy[3] < 0.0 or xyz_rpy[4] > 0.0):
+                v_l = 2*self.visual_data.radius # returning the diameter, since the orientation of the shape is such that the radius is the principal lenght 
+            else: 
+                v_l=self.visual_data.length # returning the lenght, since the orientation of the shape is such that the radius is the principal lenght 
+        j_0 = matrix_to_xyz_rpy(joint_i.origin)[2]
+        v_o = xyz_rpy[2]
         joint_offset_temp = v_o + v_l*math.copysign(1,j_0)/2 - j_0
         joint_offset = v_o-joint_offset_temp
-        return link_offset, joint_offset
+        return joint_offset
         
         
 
@@ -127,28 +127,36 @@ class linkParametric():
         length = self.get_principal_length()/2
         if self.geometry_type == Geometry.BOX:
             index_to_change = 2 
-            if (self.link_characteristic.dimension == Side.DEPTH):
-                index_to_change = 2
-            elif(self.link_characteristic.dimension == Side.WIDTH):
-                index_to_change = 0
-            elif(self.link_characteristic.dimension == Side.HEIGHT):
-                index_to_change = 1
-
-            if(self.link_characteristic.calculate_origin_from_dimension):
-                temp = self.visual_data_new[index_to_change]
-                xyz_rpy[index_to_change] = temp 
-                origin[2] = temp 
-            origin[2] += self.link_characteristic.offset
+            # if (self.link_characteristic.dimension == Side.DEPTH):
+            #     index_to_change = 2
+            # elif(self.link_characteristic.dimension == Side.WIDTH):
+            #     index_to_change = 0
+            # elif(self.link_characteristic.dimension == Side.HEIGHT):
+            #     index_to_change = 1
+            # if(self.link_characteristic.calculate_origin_from_dimension):
+            #     temp = self.visual_data_new[index_to_change]
+            #     xyz_rpy[index_to_change] = temp 
+            #     origin[2] = temp 
+            origin[2] += self.offset
         elif self.geometry_type == Geometry.CYLINDER:
-            origin[2] =(length+ self.link_characteristic.offset)*math.copysign(1,xyz_rpy[2])
+            # print("lenght", length)
+            # print("offset", self.link_characteristic.offset)
+            # print("vo", xyz_rpy[2])
+            # print(self.link.name)
+            # print("lenght",length)
+            # print("offset", self.link_characteristic.offset)
+            origin[2] =(length+ self.offset)
             origin[0] = xyz_rpy[0]
             origin[1] = xyz_rpy[1]
             origin[3] = xyz_rpy[3]
             origin[4] = xyz_rpy[4]
             origin[5] = xyz_rpy[5]
+            # print(xyz_rpy)
+            # print(origin)
+            # origin = xyz_rpy
         elif self.geometry_type == Geometry.SPHERE:
             "in case of a sphere the origin of the framjoint_name_list[0]:link_parametric.JointCharacteristics(0.0295),e does not change"
-            origin = xyz_rpy
+            origin = xyz_rpy 
         return origin
 
     def compute_inertia_parametric(self):
@@ -185,12 +193,12 @@ class linkParametric():
 
         elif self.geometry_type == Geometry.BOX:
             index = 2
-            if (self.link_characteristic.dimension == Side.DEPTH):
-                index = 2
-            elif(self.link_characteristic.dimension == Side.WIDTH):
-                index = 0
-            elif(self.link_characteristic.dimension == Side.HEIGHT):
-                index = 1
+            # if (self.link_characteristic.dimension == Side.DEPTH):
+            #     index = 2
+            # elif(self.link_characteristic.dimension == Side.WIDTH):
+            #     index = 0
+            # elif(self.link_characteristic.dimension == Side.HEIGHT):
+            #     index = 1
             return self.visual_data_new[index]
         
         else:
@@ -198,14 +206,13 @@ class linkParametric():
             return 0
 
 class jointParametric:
-    def __init__(self, joint_name, parent_link, joint, joint_characteristic) -> None:
+    def __init__(self, joint_name, parent_link, joint) -> None:
         self.jointName = joint_name
         self.parent_link_name = parent_link
         self.joint = joint
         self.parent_link = parent_link
-        self.jointCharacteristic  = joint_characteristic
-        self.link_offset, joint_offset = self.parent_link.compute_offsets()
-        joint_characteristic.offset = joint_offset
+        joint_offset = self.parent_link.compute_joint_offset(joint)
+        self.offset = joint_offset
         self.origin = self.modify()
         
     def modify(self):
@@ -219,5 +226,5 @@ class jointParametric:
         xyz_rpy[3] = xyz_rpy_temp[3]
         xyz_rpy[4] = xyz_rpy_temp[4]
         xyz_rpy[5] = xyz_rpy_temp[5]
-        xyz_rpy[2] = length/2*math.copysign(1,xyz_rpy[2]) + self.jointCharacteristic.offset
+        xyz_rpy[2] = length/2*math.copysign(1,xyz_rpy[2]) + self.offset
         return xyz_rpy
