@@ -3,6 +3,8 @@ from urdfpy import matrix_to_xyz_rpy
 from enum import Enum
 import math
 
+import urdfpy
+
 class I_parametric():
     def __init__(self) -> None:
         self.ixx = 0.0
@@ -25,16 +27,12 @@ class Side(Enum):
     DEPTH = 3
 
 class linkParametric():
-    def __init__(self, link_name: str, length_multiplier, density, robot, link) -> None:
+    def __init__(self, link_name: str, length_multiplier, density, link) -> None:
         self.name = link_name
         self.density = density
         self.length_multiplier = length_multiplier
         self.link = link
         self.geometry_type, self.visual_data = self.get_geometry(self.get_visual())
-        parent_joint_list = [corresponding_joint for corresponding_joint in robot.joints if corresponding_joint.child == link.name]
-        self.parent_joint = (parent_joint_list[0] if parent_joint_list else None)
-        child_joint_list = [corresponding_joint for corresponding_joint in robot.joints if corresponding_joint.parent == link.name]
-        self.child_joint = (child_joint_list[0] if child_joint_list else None)
         link_offset = self.compute_offset()
         self.offset = link_offset
         
@@ -206,7 +204,7 @@ class linkParametric():
             return 0
 
 class jointParametric:
-    def __init__(self, joint_name, parent_link, joint) -> None:
+    def __init__(self, joint_name:str, parent_link:linkParametric, joint:urdfpy.Joint) -> None:
         self.jointName = joint_name
         self.parent_link_name = parent_link
         self.joint = joint

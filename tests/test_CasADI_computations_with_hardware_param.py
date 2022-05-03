@@ -6,14 +6,11 @@ import logging
 from os import link
 
 import casadi as cs
-import idyntree.swig as idyntree
 import numpy as np
 # import pytest
 import math 
-
 from adam.casadi.computations import KinDynComputations
 from adam.geometry import utils
-from adam.core import link_parametric
 
 model_path ="/home/carlotta/iit_ws/element_hardware-intelligence/ModelsTemp/ModelModified0.urdf"
 
@@ -42,37 +39,6 @@ joints_name_list = [
     "r_ankle_pitch",
     "r_ankle_roll",
 ]
-
-part_list ="RightLeg"
-
-def get_link_join_char(linkPartName):
-    links_characteristics = []
-    joint_characteristics = []
-    link_name_list = []
-    if(linkPartName == 'RightArm'): 
-        link_name_list = ['r_upper_arm', 'r_forearm']
-        joint_name_list = link_name_list
-        return link_name_list, joint_name_list
-    if(linkPartName == 'LeftArm'): 
-        link_name_list = ['l_upper_arm', 'l_forearm']
-        joint_name_list = link_name_list
-        return link_name_list, joint_name_list
-    
-    if(linkPartName == 'RightLeg'): 
-        link_name_list = ['r_upper_leg','r_lower_leg', 'r_hip_1', 'r_hip_2', 'r_ankle_1', 'r_ankle_2']
-        joint_name_list = link_name_list
-        links_characteristics = {}
-        joint_characteristics = {}
-        return link_name_list, joint_name_list
-    if(linkPartName == 'LeftLeg'): 
-        link_name_list = ['l_ankle_2']
-        joint_name_list = link_name_list
-        return link_name_list, joint_name_list
-    if(linkPartName == 'Torso'): 
-        link_name_list = ['root_link', 'torso_1', 'torso_2', 'chest']
-        joint_name_list = link_name_list
-        return link_name_list, joint_name_list
-
 def ComputeOriginalDensity(kinDyn, link_name): 
     link_original = kinDyn.get_element_by_name(link_name, kinDyn.robot_desc)
     mass = link_original.inertial.mass
@@ -95,17 +61,6 @@ def ComputeOriginalDensity(kinDyn, link_name):
 def SX2DM(x):
     return cs.DM(x)
 
-
-# def H_from_Pos_RPY_idyn(xyz, rpy):
-#     T = idyntree.Transform.Identity()
-#     R = idyntree.Rotation.RPY(rpy[0], rpy[1], rpy[2])
-#     p = idyntree.Position()
-#     [p.setVal(i, xyz[i]) for i in range(3)]
-#     T.setRotation(R)
-#     T.setPosition(p)
-#     return T
-
-
 logging.basicConfig(level=logging.DEBUG)
 logging.debug("Showing the robot tree.")
 
@@ -113,16 +68,14 @@ logging.debug("Showing the robot tree.")
 root_link = "root_link"
 comp = KinDynComputations(model_path, joints_name_list, root_link)
 
-[link_name_list, _] = get_link_join_char(part_list)
-
-
+link_name_list = ['r_upper_leg','r_lower_leg', 'r_hip_1', 'r_hip_2', 'r_ankle_1', 'r_ankle_2','l_upper_leg','l_lower_leg', 'l_hip_1', 'l_hip_2', 'l_ankle_1', 'l_ankle_2', 'l_shoulder_1', 'l_shoulder_2', 'l_shoulder_3', 'l_elbow_1','r_shoulder_1', 'r_shoulder_2', 'r_shoulder_3', 'r_elbow_1']
 comp_w_hardware = KinDynComputations(model_path, joints_name_list, root_link, np.zeros(len(joints_name_list)),link_name_list)
 original_density = []
 for item in link_name_list: 
     original_density += [ComputeOriginalDensity(comp_w_hardware,item)]
 
 original_length = np.ones([len(link_name_list),3])
-print("original density",original_density)
+
 joint_type = np.zeros(len(joints_name_list))
 
 n_dofs = len(joints_name_list)
@@ -144,9 +97,9 @@ M = comp.mass_matrix_fun()
 M_with_hardware = comp_w_hardware.mass_matrix_fun()
 mass_test = SX2DM(M(H_b, s_))
 mass_test_hardware = SX2DM(M_with_hardware(H_b,s_, original_density, original_length))
-print("original density", original_density)
-print("orginal length", original_length)
 print("M=",cs.sumsqr(mass_test - mass_test_hardware))
+print(mass_test.shape)
+print(mass_test_hardware.shape)
     # assert mass_test - mass_test_hardware == pytest.approx(0.0, abs=1e-5)
 
 
