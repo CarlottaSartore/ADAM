@@ -98,8 +98,6 @@ M_with_hardware = comp_w_hardware.mass_matrix_fun()
 mass_test = SX2DM(M(H_b, s_))
 mass_test_hardware = SX2DM(M_with_hardware(H_b,s_, original_density, original_length))
 print("M=",cs.sumsqr(mass_test - mass_test_hardware))
-print(mass_test.shape)
-print(mass_test_hardware.shape)
     # assert mass_test - mass_test_hardware == pytest.approx(0.0, abs=1e-5)
 
 

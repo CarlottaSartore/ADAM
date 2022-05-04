@@ -159,6 +159,8 @@ class linkParametric():
 
     def compute_inertia_parametric(self):
         I = I_parametric
+        visual = self.get_visual()
+        xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
         """Calculates inertia (ixx, iyy and izz) with the formula that corresponds to the geometry
         Formulas retrieved from https://en.wikipedia.org/wiki/List_of_moments_of_inertia"""
         if self.geometry_type == Geometry.BOX:
@@ -172,6 +174,15 @@ class linkParametric():
             I.ixx = self.mass * i_xy_incomplete
             I.iyy = self.mass * i_xy_incomplete
             I.izz = self.mass * self.visual_data_new[1] ** 2 / 2
+
+            if(xyz_rpy[3]>0 and xyz_rpy[4] == 0.0 and xyz_rpy[5] == 0.0):
+                itemp = I.izz
+                I.iyy = itemp
+                I.izz = I.ixx
+            elif(xyz_rpy[4]>0.0):
+                itemp = I.izz
+                I.ixx = itemp
+                I.izz = I.iyy
             return I
         elif self.geometry_type == Geometry.SPHERE:
             I.ixx = 2 * self.mass * self.visual_data_new** 2 / 5
