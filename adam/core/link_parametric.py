@@ -1,3 +1,4 @@
+from operator import length_hint
 from os import link
 from urdfpy import matrix_to_xyz_rpy
 from enum import Enum
@@ -42,39 +43,64 @@ class linkParametric():
         self.origin = self.modify_origin()
         self.inertial = self.I
        
-
-    def compute_offset(self): 
-        # Taking the principal direction i.e. the length 
+    def get_principal_lenght(self): 
         visual = self.get_visual()
         xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
-        v_l= 0.0
         if self.geometry_type == Geometry.CYLINDER:
             if(xyz_rpy[3] < 0.0 or xyz_rpy[4] > 0.0):
                 v_l = 2*self.visual_data.radius # returning the diameter, since the orientation of the shape is such that the radius is the principal lenght 
             else: 
                 v_l=self.visual_data.length # returning the lenght, since the orientation of the shape is such that the radius is the principal lenght 
+        elif(self.geometry_type == Geometry.SPHERE): 
+            v_l = self.visual_data.radius
+        elif(self.geometry_type == Geometry.BOX): 
+            v_l= self.visual_data.size[2]
+        else:
+            raise Exception(f"THE GEOMETRY IS NOT SPECIFIED")
+        return v_l 
+
+    def get_principal_lenght_parametric(self): 
+        visual = self.get_visual()
+        xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
+        if self.geometry_type == Geometry.CYLINDER:
+            if(xyz_rpy[3] < 0.0 or xyz_rpy[4] > 0.0):
+                v_l = 2*self.visual_data_new[1] # returning the diameter, since the orientation of the shape is such that the radius is the principal lenght 
+            else: 
+                v_l=self.visual_data_new[0] # returning the lenght, since the orientation of the shape is such that the radius is the principal lenght 
+        elif(self.geometry_type == Geometry.SPHERE): 
+            v_l = self.visual_data_new
+        elif(self.geometry_type == Geometry.BOX): 
+            v_l= self.visual_data_new[2]
+        else:
+            raise Exception(f"THE GEOMETRY IS NOT SPECIFIED")
+        return v_l 
+   
+    def compute_offset(self): 
+        visual = self.get_visual()
+        xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
+        v_l=  self.get_principal_lenght()
         v_o = xyz_rpy[2]
-        link_offset = (v_o - v_l/2)
+        if(v_o<0):
+            link_offset = v_l/2 + v_o
+        else:
+            link_offset = (v_o - v_l/2)
         return link_offset
 
-    def compute_joint_offset(self,joint_i): 
+    def compute_joint_offset(self,joint_i, parent_offset): 
          # Taking the principal direction i.e. the length 
         visual = self.get_visual()
         xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
-        v_l= 0.0
-        if self.geometry_type == Geometry.CYLINDER:
-            if(xyz_rpy[3] < 0.0 or xyz_rpy[4] > 0.0):
-                v_l = 2*self.visual_data.radius # returning the diameter, since the orientation of the shape is such that the radius is the principal lenght 
-            else: 
-                v_l=self.visual_data.length # returning the lenght, since the orientation of the shape is such that the radius is the principal lenght 
+        v_l= self.get_principal_lenght()
         j_0 = matrix_to_xyz_rpy(joint_i.origin)[2]
         v_o = xyz_rpy[2]
-        joint_offset_temp = v_o + v_l*math.copysign(1,j_0)/2 - j_0
-        joint_offset = v_o-joint_offset_temp
+        if(j_0<0):
+            joint_offset_temp = -(v_l + j_0-parent_offset)
+            joint_offset = joint_offset_temp
+        else:
+            joint_offset_temp = v_l + parent_offset - j_0
+            joint_offset = joint_offset_temp
         return joint_offset
-        
-        
-
+    
     def get_visual(self):
         """Returns the visual object of a link"""
         return self.link.visuals[0]
@@ -121,38 +147,24 @@ class linkParametric():
         origin = [0.0,0.0,0.0,0.0,0.0,0.0]
         visual = self.get_visual()
         """Modifies the position of the origin by a given amount"""
-        xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
-        length = self.get_principal_length()/2
-        if self.geometry_type == Geometry.BOX:
-            index_to_change = 2 
-            # if (self.link_characteristic.dimension == Side.DEPTH):
-            #     index_to_change = 2
-            # elif(self.link_characteristic.dimension == Side.WIDTH):
-            #     index_to_change = 0
-            # elif(self.link_characteristic.dimension == Side.HEIGHT):
-            #     index_to_change = 1
-            # if(self.link_characteristic.calculate_origin_from_dimension):
-            #     temp = self.visual_data_new[index_to_change]
-            #     xyz_rpy[index_to_change] = temp 
-            #     origin[2] = temp 
-            origin[2] += self.offset
-        elif self.geometry_type == Geometry.CYLINDER:
-            # print("lenght", length)
-            # print("offset", self.link_characteristic.offset)
-            # print("vo", xyz_rpy[2])
-            # print(self.link.name)
-            # print("lenght",length)
-            # print("offset", self.link_characteristic.offset)
-            origin[2] =(length+ self.offset)
+        xyz_rpy = matrix_to_xyz_rpy(visual.origin)
+        v_o = xyz_rpy[2] 
+        length = self.get_principal_lenght_parametric()
+        if(v_o<0):
+            origin[2] = self.offset-length/2
             origin[0] = xyz_rpy[0]
             origin[1] = xyz_rpy[1]
             origin[3] = xyz_rpy[3]
             origin[4] = xyz_rpy[4]
             origin[5] = xyz_rpy[5]
-            # print(xyz_rpy)
-            # print(origin)
-            # origin = xyz_rpy
-        elif self.geometry_type == Geometry.SPHERE:
+        else:
+            origin[2] = length/2 +self.offset
+            origin[0] = xyz_rpy[0]
+            origin[1] = xyz_rpy[1]
+            origin[3] = xyz_rpy[3]
+            origin[4] = xyz_rpy[4]
+            origin[5] = xyz_rpy[5]
+        if self.geometry_type == Geometry.SPHERE:
             "in case of a sphere the origin of the framjoint_name_list[0]:link_parametric.JointCharacteristics(0.0295),e does not change"
             origin = xyz_rpy 
         return origin
@@ -190,43 +202,20 @@ class linkParametric():
             I.izz = I.ixx
         return I
 
-    def get_principal_length(self):   
-        visual = self.get_visual()
-    #    """Modifies the position of the origin by a given amount"""
-        xyz_rpy = matrix_to_xyz_rpy(visual.origin) 
-        if self.geometry_type == Geometry.CYLINDER:
-            if(xyz_rpy[3] < 0.0 or xyz_rpy[4] > 0.0):
-                return 2*self.visual_data_new[1] # returning the diameter, since the orientation of the shape is such that the radius is the principal lenght 
-            else: 
-                return self.visual_data_new[0] # returning the lenght, since the orientation of the shape is such that the radius is the principal lenght 
-
-        elif self.geometry_type == Geometry.BOX:
-            index = 2
-            # if (self.link_characteristic.dimension == Side.DEPTH):
-            #     index = 2
-            # elif(self.link_characteristic.dimension == Side.WIDTH):
-            #     index = 0
-            # elif(self.link_characteristic.dimension == Side.HEIGHT):
-            #     index = 1
-            return self.visual_data_new[index]
-        
-        else:
-        
-            return 0
-
 class jointParametric:
     def __init__(self, joint_name:str, parent_link:linkParametric, joint:urdfpy.Joint) -> None:
         self.jointName = joint_name
         self.parent_link_name = parent_link
         self.joint = joint
         self.parent_link = parent_link
-        joint_offset = self.parent_link.compute_joint_offset(joint)
+        joint_offset = self.parent_link.compute_joint_offset(joint, self.parent_link.offset)
         self.offset = joint_offset
-        self.origin = self.modify()
+        self.origin = self.modify(self.parent_link.offset)
         
-    def modify(self):
-        length = self.parent_link.get_principal_length()
+    def modify(self, parent_joint_offset):
+        length = self.parent_link.get_principal_lenght_parametric()
         # Ack for avoiding depending on casadi 
+        vo = self.parent_link.origin[2]
         xyz_rpy = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         xyz_rpy[0] = self.joint.origin[0,3]
         xyz_rpy[1] = self.joint.origin[1,3]
@@ -235,5 +224,16 @@ class jointParametric:
         xyz_rpy[3] = xyz_rpy_temp[3]
         xyz_rpy[4] = xyz_rpy_temp[4]
         xyz_rpy[5] = xyz_rpy_temp[5]
-        xyz_rpy[2] = length/2*math.copysign(1,xyz_rpy[2]) + self.offset
+        # print("original",xyz_rpy)
+        # print("lenght", length)
+        # print("s_0", parent_joint_offset)
+        # print("offset", self.offset)
+        # print("joint name", self.joint.name)
+        if(xyz_rpy[2]<0): 
+            # print("negative")
+            xyz_rpy[2] = -length +parent_joint_offset - self.offset   
+        else:
+            # print("positive")
+            xyz_rpy[2] = vo+ length/2 - self.offset
+        # print("new", xyz_rpy)
         return xyz_rpy
