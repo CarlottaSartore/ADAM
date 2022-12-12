@@ -27,8 +27,8 @@ class RBDAlgorithms(SpatialMathAbstract):
         joints_name_list: list,
         root_link: str,
         gravity: np.array,
+        link_name_list: list = [],
         joint_type: np.array= None,
-        link_name_list: list = []
     ) -> None:
         """
         Args:
@@ -65,7 +65,7 @@ class RBDAlgorithms(SpatialMathAbstract):
             return None
     
     def get_joint_type(self, joint_i, o_joint, axis): 
-        joint_type_i = "ciao"
+        joint_type_i = ""
         o_joint_new = o_joint
         joint_limits = 0.02
         if(not(self.joint_type is None)): 
@@ -311,8 +311,6 @@ class RBDAlgorithms(SpatialMathAbstract):
                     T_fk = T_fk @ T_joint
                     p_prev = P_ee - T_fk[:3, 3]
                     z_prev = T_fk[:3, :3] @ joint.axis
-                    # J[:, joint.idx] = self.vertcat(
-                    #     cs.jacobian(P_ee, joint_positions[joint.idx]), z_prev) # using casadi jacobian
                     if joint.idx is not None:
                         J[:, joint.idx] = self.vertcat(
                             self.skew(z_prev) @ p_prev, z_prev
@@ -331,8 +329,6 @@ class RBDAlgorithms(SpatialMathAbstract):
                     T_fk = T_fk @ T_joint
                     p_prev = P_ee - T_fk[:3, 3]
                     z_prev = T_fk[:3, :3] @ joint.axis
-                    # J[:, joint.idx] = self.vertcat(
-                    #     cs.jacobian(P_ee, joint_positions[joint.idx]), z_prev) # using casadi jacobian
                     if joint.idx is not None:
                         J[:, joint.idx] = self.vertcat(
                             self.skew(z_prev) @ p_prev, z_prev
@@ -388,8 +384,6 @@ class RBDAlgorithms(SpatialMathAbstract):
                     T_fk = T_fk @ T_joint
                     p_prev = P_ee - T_fk[:3, 3]
                     z_prev = T_fk[:3, :3] @ joint.axis
-                    # J[:, joint.idx] = self.vertcat(
-                    #     cs.jacobian(P_ee, joint_positions[joint.idx]), z_prev) # using casadi jacobian
                     if joint.idx is not None:
                         J[:, joint.idx] = self.vertcat(
                             self.skew(z_prev) @ p_prev, z_prev
@@ -408,8 +402,6 @@ class RBDAlgorithms(SpatialMathAbstract):
                         T_fk = T_fk @ T_joint
                         p_prev = P_ee - T_fk[:3, 3]
                         z_prev = T_fk[:3, :3] @ joint.axis
-                        # J[:, joint.idx] = self.vertcat(
-                        #     cs.jacobian(P_ee, joint_positions[joint.idx]), z_prev) # using casadi jacobian
                         if joint.idx is not None:
                             J[:, joint.idx] = self.vertcat(
                                 self.skew(z_prev) @ p_prev, z_prev
@@ -622,11 +614,6 @@ class RBDAlgorithms(SpatialMathAbstract):
                 o_joint = []
                 rpy_joint = []        
                 axis = [0.0,0.0,0.0]
-        # if(self.tree.parents[index].name in ["r_upper_leg", "r_lower_leg"]):
-        #     print(joint_i.name)
-        #     print("o joint", o_joint)
-        #     print("rpy_joint", rpy_joint)
-        #     print("axis", axis )
         return o_joint, rpy_joint, joint_i, axis
 
     def getLinkAttributes(self, index, lenght_multiplier, density): 
@@ -651,21 +638,7 @@ class RBDAlgorithms(SpatialMathAbstract):
             origin = urdfpy.matrix_to_xyz_rpy(link_i.inertial.origin)
             o = [origin[0],origin[1], origin[2]]
             rpy = [origin[3], origin[4], origin[5]]
-            Ic = self.spatial_inertia(I, mass, o, rpy)
-        # if(link_i.name in ["r_upper_leg", "r_lower_leg"]):
-        #     print(link_i.name)
-        #     print("origin", o)
-        #     print("inertia")
-        #     if(hasattr(I, "ixx")):
-        #         print(I.ixx)
-        #         print(I.iyy)
-        #         print(I.izz)
-        #     else:
-        #         print(I[0,0])
-        #         print(I[1,1])
-        #         print(I[2,2])
-        #     print("rpy",rpy)
-        #     print("mass", mass)             
+            Ic = self.spatial_inertia(I, mass, o, rpy)           
         return Ic, o, rpy, mass, link_i
 
     def aba(self):

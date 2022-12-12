@@ -19,9 +19,9 @@ class KinDynComputations(RBDAlgorithms, SpatialMathCasadi):
         urdfstring: str,
         joints_name_list: list,
         root_link: str = "root_link",
-        joint_type: np.array= None,
         link_name_list: list = [], 
         gravity: np.array = np.array([0, 0, -9.80665, 0, 0, 0], dtype=object),
+        joint_type: np.array= None,
         f_opts: dict = dict(jit=False, jit_options=dict(flags="-Ofast")),
     ) -> None:
         """

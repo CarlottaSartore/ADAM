@@ -224,16 +224,8 @@ class jointParametric:
         xyz_rpy[3] = xyz_rpy_temp[3]
         xyz_rpy[4] = xyz_rpy_temp[4]
         xyz_rpy[5] = xyz_rpy_temp[5]
-        # print("original",xyz_rpy)
-        # print("lenght", length)
-        # print("s_0", parent_joint_offset)
-        # print("offset", self.offset)
-        # print("joint name", self.joint.name)
         if(xyz_rpy[2]<0): 
-            # print("negative")
             xyz_rpy[2] = -length +parent_joint_offset - self.offset   
         else:
-            # print("positive")
             xyz_rpy[2] = vo+ length/2 - self.offset
-        # print("new", xyz_rpy)
         return xyz_rpy

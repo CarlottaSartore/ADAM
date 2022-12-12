@@ -61,10 +61,10 @@ class SpatialMathCasadi(SpatialMathAbstract):
         T = cls.eye(4)
         R = cls.R_from_RPY(rpy)
         T[:3,:3] = R
-        q_incrementa = q*axis
-        T[0,3] = xyz[0] +q_incrementa[0]
-        T[1,3] = xyz[1] +q_incrementa[1]
-        T[2,3] = xyz[2] +q_incrementa[2] 
+        q_increment = q*axis
+        T[0,3] = xyz[0] +q_increment[0]
+        T[1,3] = xyz[1] +q_increment[1]
+        T[2,3] = xyz[2] +q_increment[2] 
         return T 
         
     
