@@ -67,27 +67,24 @@ class RBDAlgorithms(SpatialMathAbstract):
     def get_joint_type(self, joint_i, o_joint, axis): 
         joint_type_i = ""
         o_joint_new = o_joint
-        joint_limits = 0.02
-        if(not(self.joint_type is None)): 
-            if(joint_i in self.joints_list): 
-                idx = self.joints_list.index(joint_i)
-                if(self.joint_type[idx] == 0): 
-                    joint_type_i = "revolute"
-                else: 
-                    joint_type_i = "prismatic"
-                    if(abs(axis[2]) == 1.0): 
-                        o_joint_new[2] = o_joint[2] + joint_limits
-            else: 
-                if(hasattr(joint_i, "joint_type")): 
-                    return joint_i.joint_type, o_joint_new
-        else: 
-            if(hasattr(joint_i, "joint_type")): 
-                return joint_i.joint_type, o_joint_new
+        # joint_limits = 0.02
+        # if(not(self.joint_type is None)): 
+        #     if(joint_i in self.joints_list): 
+        #         idx = self.joints_list.index(joint_i)
+        #         if(self.joint_type[idx] == 0): 
+        #             joint_type_i = "revolute"
+        #         else: 
+        #             joint_type_i = "prismatic"
+        #             if(abs(axis[2]) == 1.0): 
+        #                 o_joint_new[2] = o_joint[2] + joint_limits
+        #     else: 
+        #         if(hasattr(joint_i, "joint_type")): 
+        #             return joint_i.joint_type, o_joint_new
+        # else: 
+        if(hasattr(joint_i, "joint_type")): 
+            return joint_i.joint_type, o_joint_new
         return joint_type_i, o_joint_new
 
-    def set_jont_type(self, joint_type): 
-        self.joint_type = joint_type
-    
     def crba(self, base_transform: T, joint_positions: T,density: T = None, length_multiplier: T = None) -> T:
         """This function computes the Composite Rigid body algorithm (Roy Featherstone) that computes the Mass Matrix.
          The algorithm is complemented with Orin's modifications computing the Centroidal Momentum Matrix
