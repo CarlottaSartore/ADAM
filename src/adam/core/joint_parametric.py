@@ -23,7 +23,7 @@ class jointParametric:
             xyz[2] = -length + self.parent_link_offset - self.offset
         else:
             xyz[2] = vo + length / 2 - self.offset
-        self.xyz = xyz.array
+        self.xyz = xyz
 
     def update_parent_link_and_joint(self, length_multiplier, density):
         self.parent_link.update_link(length_multiplier, density)
