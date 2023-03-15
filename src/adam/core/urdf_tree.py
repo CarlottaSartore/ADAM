@@ -48,7 +48,8 @@ class URDFTree:
             root_link (str, optional): the first link. Defaults to 'root_link'
             link_parametric_list (list, optional): list of link parametric w.r.t. length and density.
         """
-        self.robot_desc = URDF.from_xml_file(urdfstring)
+        # self.robot_desc = URDF.from_xml_file(urdfstring)
+        self.robot_desc = URDF.from_xml_string(urdfstring)
         self.joints_list = self.get_joints_info_from_reduced_model(joints_name_list)
         self.NDoF = len(self.joints_list)
         self.root_link = root_link
